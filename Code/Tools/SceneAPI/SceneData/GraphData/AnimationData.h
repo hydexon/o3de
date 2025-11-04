@@ -30,20 +30,27 @@ namespace AZ
 
                 SCENE_DATA_API AnimationData();
                 SCENE_DATA_API ~AnimationData() override = default;
-                SCENE_DATA_API virtual void AddKeyFrame(const SceneAPI::DataTypes::MatrixType& keyFrameTransform);
-                SCENE_DATA_API virtual void ReserveKeyFrames(size_t count);
-                SCENE_DATA_API virtual void SetTimeStepBetweenFrames(double timeStep);
+                // SCENE_DATA_API virtual void AddKeyFrame(const SceneAPI::DataTypes::MatrixType& keyFrameTransform);
+                // SCENE_DATA_API virtual void ReserveKeyFrames(size_t count);
+                // SCENE_DATA_API virtual void SetTimeStepBetweenFrames(double timeStep);
 
-                SCENE_DATA_API size_t GetKeyFrameCount() const override;
-                SCENE_DATA_API const SceneAPI::DataTypes::MatrixType& GetKeyFrame(size_t index) const override;
+                // SCENE_DATA_API size_t GetKeyFrameCount() const override;
+                // SCENE_DATA_API const SceneAPI::DataTypes::MatrixType& GetKeyFrame(size_t index) const override;
 
-                SCENE_DATA_API double GetTimeStepBetweenFrames() const override;
+                // SCENE_DATA_API double GetTimeStepBetweenFrames() const override;
+
+                SCENE_DATA_API virtual void AddAnimationStack(const AnimationEntry& entry);
+                
+                SCENE_DATA_API size_t GetAnimationStackCount() const override;
+                SCENE_DATA_API bool GetAnimationStackByName(const AZStd::string& name, AnimationEntry& outEntry) const override;
+                SCENE_DATA_API bool GetAnimationStack(size_t index, AnimationEntry& outEntry) override;
 
                 SCENE_DATA_API void GetDebugOutput(SceneAPI::Utilities::DebugOutput& output) const override;
 
                 SCENE_DATA_API AZStd::vector<SceneAPI::DataTypes::MatrixType>& GetKeyFrames();
                 SCENE_DATA_API const AZStd::vector<SceneAPI::DataTypes::MatrixType>& GetKeyFrames() const;
             protected:
+                AZStd::vector<SceneAPI::DataTypes::IAnimationData::AnimationEntry> m_animEntries;
                 AZStd::vector<SceneAPI::DataTypes::MatrixType>    m_keyFrames;
                 double                                            m_timeStepBetweenFrames;
             };

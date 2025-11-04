@@ -33,9 +33,12 @@ namespace AZ
                         ->Attribute(AZ::Script::Attributes::ExcludeFrom, AZ::Script::Attributes::ExcludeFlags::ListOnly)
                         ->Attribute(AZ::Script::Attributes::Scope, AZ::Script::Attributes::ScopeFlags::Common)
                         ->Attribute(AZ::Script::Attributes::Module, "scene")
-                        ->Method("GetKeyFrameCount", &SceneAPI::DataTypes::IAnimationData::GetKeyFrameCount)
-                        ->Method("GetKeyFrame", &SceneAPI::DataTypes::IAnimationData::GetKeyFrame)
-                        ->Method("GetTimeStepBetweenFrames", &SceneAPI::DataTypes::IAnimationData::GetTimeStepBetweenFrames);
+                        ->Method("GetAnimationStackCount", &SceneAPI::DataTypes::IAnimationData::GetAnimationStackCount)
+                        ->Method("GetAnimationStackByName", &SceneAPI::DataTypes::IAnimationData::GetAnimationStackByName)
+                        ->Method("GetAnimationStack", &SceneAPI::DataTypes::IAnimationData::GetAnimationStack);
+                        // ->Method("GetKeyFrameCount", &SceneAPI::DataTypes::IAnimationData::GetKeyFrameCount)
+                        // ->Method("GetKeyFrame", &SceneAPI::DataTypes::IAnimationData::GetKeyFrame)
+                        // ->Method("GetTimeStepBetweenFrames", &SceneAPI::DataTypes::IAnimationData::GetTimeStepBetweenFrames);
 
                     behaviorContext->Class<AnimationData>()
                         ->Attribute(AZ::Script::Attributes::Scope, AZ::Script::Attributes::ScopeFlags::Common)
@@ -44,9 +47,10 @@ namespace AZ
             }
 
             AnimationData::AnimationData()
-                : m_timeStepBetweenFrames(1.0/30.0) // default value
+                //: m_timeStepBetweenFrames(1.0/30.0) // default value
             {
             }
+#if 0
 
             void AnimationData::AddKeyFrame(const SceneAPI::DataTypes::MatrixType& keyFrameTransform)
             {
@@ -77,6 +81,40 @@ namespace AZ
             double AnimationData::GetTimeStepBetweenFrames() const
             {
                 return m_timeStepBetweenFrames;
+            }
+#endif
+            SCENE_DATA_API void AnimationData::AddAnimationStack(const AnimationEntry& entry)
+            {
+                m_animEntries.push_back(entry);
+            }
+            size_t AnimationData::GetAnimationStackCount() const
+            {
+                return m_animEntries.size();
+            }
+
+            bool AnimationData::GetAnimationStackByName(const AZStd::string& name, AnimationEntry& outEntry) const
+            {
+                if(m_animEntries.empty())
+                    return false;
+
+                for(auto entry : m_animEntries)
+                {
+                    if(entry.GetName() == name)
+                    {
+                        outEntry = entry;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            bool AnimationData::GetAnimationStack(size_t index, AnimationEntry& outEntry)
+            {
+                if(index > m_animEntries.size())
+                    return false;
+
+                outEntry = m_animEntries[index];
+                return true;
             }
 
             void AnimationData::GetDebugOutput(SceneAPI::Utilities::DebugOutput& output) const

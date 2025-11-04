@@ -283,7 +283,7 @@ namespace EMotionFX
                     continue;
                 }
 
-                const SceneDataTypes::IAnimationData* animation = azrtti_cast<const SceneDataTypes::IAnimationData*>(result->get());
+                SceneDataTypes::IAnimationData* animation = azrtti_cast<SceneDataTypes::IAnimationData*>(result->get());
                 const size_t jointDataIndex = motionData->AddJoint(nodeName, Transform::CreateIdentity(), Transform::CreateIdentity());
 
                 // Keep track of the sample joint index.
@@ -300,120 +300,126 @@ namespace EMotionFX
                     rootJoints.emplace_back(jointDataIndex);
                 }
 
-                const size_t sceneFrameCount = aznumeric_caster(animation->GetKeyFrameCount());
-                size_t startFrame = 0;
-                size_t endFrame = 0;
-                float playbackSpeed = 1.0f;
-                if (motionGroup.GetRuleContainerConst().ContainsRuleOfType<const Rule::MotionRangeRule>())
+                for(size_t ai = 0; ai < animation->GetAnimationStackCount(); ++ai)
                 {
-                    AZStd::shared_ptr<const Rule::MotionRangeRule> motionRangeRule = motionGroup.GetRuleContainerConst().FindFirstByType<const Rule::MotionRangeRule>();
-                    startFrame = aznumeric_caster(motionRangeRule->GetStartFrame());
-                    endFrame = aznumeric_caster(motionRangeRule->GetEndFrame());
-                    playbackSpeed = motionRangeRule->GetPlaybackSpeed();
+                    SceneDataTypes::IAnimationData::AnimationEntry entry;
+                    animation->GetAnimationStack(ai, entry);                    
 
-                    // Sanity check
-                    if (startFrame >= sceneFrameCount)
+                    const size_t sceneFrameCount = aznumeric_caster(entry.GetKeyFrameCount());
+                    size_t startFrame = 0;
+                    size_t endFrame = 0;
+                    float playbackSpeed = 1.0f;
+                    if (motionGroup.GetRuleContainerConst().ContainsRuleOfType<const Rule::MotionRangeRule>())
                     {
-                        AZ_TracePrintf(SceneUtil::ErrorWindow, "Start frame %d is greater or equal than the actual number of frames %d in animation.\n", startFrame, sceneFrameCount);
-                        return SceneEvents::ProcessingResult::Failure;
+                        AZStd::shared_ptr<const Rule::MotionRangeRule> motionRangeRule = motionGroup.GetRuleContainerConst().FindFirstByType<const Rule::MotionRangeRule>();
+                        startFrame = aznumeric_caster(motionRangeRule->GetStartFrame());
+                        endFrame = aznumeric_caster(motionRangeRule->GetEndFrame());
+                        playbackSpeed = motionRangeRule->GetPlaybackSpeed();
+
+                        // Sanity check
+                        if (startFrame >= sceneFrameCount)
+                        {
+                            AZ_TracePrintf(SceneUtil::ErrorWindow, "Start frame %d is greater or equal than the actual number of frames %d in animation.\n", startFrame, sceneFrameCount);
+                            return SceneEvents::ProcessingResult::Failure;
+                        }
+                        if (endFrame >= sceneFrameCount)
+                        {
+                            AZ_TracePrintf(SceneUtil::WarningWindow, "End frame %d is greater or equal than the actual number of frames %d in animation. Clamping the end frame to %d\n", endFrame, sceneFrameCount, sceneFrameCount - 1);
+                            endFrame = sceneFrameCount - 1;
+                        }
+                        if (playbackSpeed == 0.0f)
+                        {
+                            AZ_TracePrintf(SceneUtil::WarningWindow, "Playback speed can not be 0, defaulting to 1.\n");
+                            playbackSpeed = 1.0f;
+                        }
                     }
-                    if (endFrame >= sceneFrameCount)
+                    else
                     {
-                        AZ_TracePrintf(SceneUtil::WarningWindow, "End frame %d is greater or equal than the actual number of frames %d in animation. Clamping the end frame to %d\n", endFrame, sceneFrameCount, sceneFrameCount - 1);
+                        startFrame = 0;
                         endFrame = sceneFrameCount - 1;
                     }
-                    if (playbackSpeed == 0.0f)
-                    {
-                        AZ_TracePrintf(SceneUtil::WarningWindow, "Playback speed can not be 0, defaulting to 1.\n");
-                        playbackSpeed = 1.0f;
-                    }
-                }
-                else
-                {
-                    startFrame = 0;
-                    endFrame = sceneFrameCount - 1;
-                }
 
-                const size_t numFrames = (endFrame - startFrame) + 1;
+                    const size_t numFrames = (endFrame - startFrame) + 1;
 
-                maxNumFrames = AZ::GetMax(numFrames, maxNumFrames);
+                    maxNumFrames = AZ::GetMax(numFrames, maxNumFrames);
 
-                motionData->AllocateJointPositionSamples(jointDataIndex, numFrames);
-                motionData->AllocateJointRotationSamples(jointDataIndex, numFrames);
-                EMFX_SCALECODE
-                (
-                    motionData->AllocateJointScaleSamples(jointDataIndex, numFrames);
-                )
+                    motionData->AllocateJointPositionSamples(jointDataIndex, numFrames);
+                    motionData->AllocateJointRotationSamples(jointDataIndex, numFrames);
+                    EMFX_SCALECODE
+                    (
+                        motionData->AllocateJointScaleSamples(jointDataIndex, numFrames);
+                    )
 
-                // Get the bind pose transform in local space.
-                using SceneAPIMatrixType = AZ::SceneAPI::DataTypes::MatrixType;
-                const SceneAPIMatrixType bindSpaceLocalTransform = GetLocalSpaceBindPose(graph, rootBoneNodeIndex, boneNodeIndex, nodeTransform, nodeBone);
+                    // Get the bind pose transform in local space.
+                    using SceneAPIMatrixType = AZ::SceneAPI::DataTypes::MatrixType;
+                    const SceneAPIMatrixType bindSpaceLocalTransform = GetLocalSpaceBindPose(graph, rootBoneNodeIndex, boneNodeIndex, nodeTransform, nodeBone);
 
-                // Get the time step and make sure it didn't change compared to other joint animations.
-                const double timeStep = animation->GetTimeStepBetweenFrames() * AZ::Abs(playbackSpeed);
-                lowestTimeStep = AZ::GetMin<double>(timeStep, lowestTimeStep);
+                    // Get the time step and make sure it didn't change compared to other joint animations.
+                    const double timeStep = entry.GetTimeStepBetweenFrames() * AZ::Abs(playbackSpeed);
+                    lowestTimeStep = AZ::GetMin<double>(timeStep, lowestTimeStep);
 
-                AZ::SceneAPI::DataTypes::MatrixType sampleFrameTransformInverse;
-                if (additiveRule)
-                {
-                    size_t sampleFrameIndex = additiveRule->GetSampleFrameIndex();
-                    if (sampleFrameIndex >= sceneFrameCount)
-                    {
-                        AZ_Assert(false, "The requested sample frame index is greater than the total frame number. Please fix it, or the frame 0 will be used as the sample frame.");
-                        sampleFrameIndex = 0;
-                    }
-                    sampleFrameTransformInverse = animation->GetKeyFrame(sampleFrameIndex).GetInverseFull();
-                }
-                
-                for (size_t frame = 0; frame < numFrames; ++frame)
-                {
-                    const float time = aznumeric_cast<float>(frame * timeStep);
-                    SceneAPIMatrixType boneTransform = animation->GetKeyFrame((playbackSpeed > 0) ? (frame + startFrame) : (endFrame - frame));
+                    AZ::SceneAPI::DataTypes::MatrixType sampleFrameTransformInverse;
                     if (additiveRule)
                     {
-                        // For additive motion, we stores the relative transform.
-                        boneTransform = sampleFrameTransformInverse * boneTransform;
+                        size_t sampleFrameIndex = additiveRule->GetSampleFrameIndex();
+                        if (sampleFrameIndex >= sceneFrameCount)
+                        {
+                            AZ_Assert(false, "The requested sample frame index is greater than the total frame number. Please fix it, or the frame 0 will be used as the sample frame.");
+                            sampleFrameIndex = 0;
+                        }
+                        sampleFrameTransformInverse = entry.GetKeyFrame(sampleFrameIndex).GetInverseFull();
                     }
-
-                    SceneAPIMatrixType boneTransformNoScale(boneTransform);
-                    const AZ::Vector3 scale = boneTransformNoScale.ExtractScale();
-                    const AZ::Transform convertedTransform = AZ::Transform::CreateFromMatrix3x4(coordSysConverter.ConvertMatrix3x4(boneTransformNoScale));
-                    const AZ::Vector3 position = convertedTransform.GetTranslation();
-                    const AZ::Quaternion rotation = convertedTransform.GetRotation();
                     
-                    // Set the pose when this is the first frame.
-                    // This is used as optimization so that poses or non-animated submotions do not need any key tracks.
-                    if (frame == 0)
+                    for (size_t frame = 0; frame < numFrames; ++frame)
                     {
-                        motionData->SetJointStaticPosition(jointDataIndex, position);
-                        motionData->SetJointStaticRotation(jointDataIndex, rotation);
+                        const float time = aznumeric_cast<float>(frame * timeStep);
+                        SceneAPIMatrixType boneTransform = entry.GetKeyFrame((playbackSpeed > 0) ? (frame + startFrame) : (endFrame - frame));
+                        if (additiveRule)
+                        {
+                            // For additive motion, we stores the relative transform.
+                            boneTransform = sampleFrameTransformInverse * boneTransform;
+                        }
+
+                        SceneAPIMatrixType boneTransformNoScale(boneTransform);
+                        const AZ::Vector3 scale = boneTransformNoScale.ExtractScale();
+                        const AZ::Transform convertedTransform = AZ::Transform::CreateFromMatrix3x4(coordSysConverter.ConvertMatrix3x4(boneTransformNoScale));
+                        const AZ::Vector3 position = convertedTransform.GetTranslation();
+                        const AZ::Quaternion rotation = convertedTransform.GetRotation();
+                        
+                        // Set the pose when this is the first frame.
+                        // This is used as optimization so that poses or non-animated submotions do not need any key tracks.
+                        if (frame == 0)
+                        {
+                            motionData->SetJointStaticPosition(jointDataIndex, position);
+                            motionData->SetJointStaticRotation(jointDataIndex, rotation);
+                            EMFX_SCALECODE
+                            (
+                                motionData->SetJointStaticScale(jointDataIndex, scale);
+                            )
+                        }
+
+                        motionData->SetJointPositionSample(jointDataIndex, frame, {time, position});
+                        motionData->SetJointRotationSample(jointDataIndex, frame, {time, rotation});
                         EMFX_SCALECODE
                         (
-                            motionData->SetJointStaticScale(jointDataIndex, scale);
+                            motionData->SetJointScaleSample(jointDataIndex, frame, {time, scale});
                         )
                     }
 
-                    motionData->SetJointPositionSample(jointDataIndex, frame, {time, position});
-                    motionData->SetJointRotationSample(jointDataIndex, frame, {time, rotation});
+                    // Set the bind pose transform.
+                    SceneAPIMatrixType bindBoneTransformNoScale(bindSpaceLocalTransform);
+                    const AZ::Vector3    bindScale = coordSysConverter.ConvertScale(bindBoneTransformNoScale.ExtractScale());
+                    const AZ::Transform convertedbindTransform = AZ::Transform::CreateFromMatrix3x4(coordSysConverter.ConvertMatrix3x4(bindBoneTransformNoScale));
+                    const AZ::Vector3    bindPosition   = convertedbindTransform.GetTranslation();
+                    const AZ::Quaternion bindRotation = convertedbindTransform.GetRotation();
+
+                    motionData->SetJointBindPosePosition(jointDataIndex, bindPosition);
+                    motionData->SetJointBindPoseRotation(jointDataIndex, bindRotation);
                     EMFX_SCALECODE
                     (
-                        motionData->SetJointScaleSample(jointDataIndex, frame, {time, scale});
+                        motionData->SetJointBindPoseScale(jointDataIndex, bindScale);
                     )
                 }
-
-                // Set the bind pose transform.
-                SceneAPIMatrixType bindBoneTransformNoScale(bindSpaceLocalTransform);
-                const AZ::Vector3    bindScale = coordSysConverter.ConvertScale(bindBoneTransformNoScale.ExtractScale());
-                const AZ::Transform convertedbindTransform = AZ::Transform::CreateFromMatrix3x4(coordSysConverter.ConvertMatrix3x4(bindBoneTransformNoScale));
-                const AZ::Vector3    bindPosition   = convertedbindTransform.GetTranslation();
-                const AZ::Quaternion bindRotation = convertedbindTransform.GetRotation();
-
-                motionData->SetJointBindPosePosition(jointDataIndex, bindPosition);
-                motionData->SetJointBindPoseRotation(jointDataIndex, bindRotation);
-                EMFX_SCALECODE
-                (
-                    motionData->SetJointBindPoseScale(jointDataIndex, bindScale);
-                )
             } // End looping through bones and adding motion data.
 
             if (rootMotionExtractionRule && sampleJointDataIndex != InvalidJointDataIndex && rootJointDataIndex != InvalidJointDataIndex)

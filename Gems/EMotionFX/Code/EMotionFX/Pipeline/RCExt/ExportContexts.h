@@ -88,6 +88,7 @@ namespace EMotionFX
             const AZ::SceneAPI::Containers::Scene& m_scene;
             const Group::IMotionGroup&             m_group;
             EMotionFX::Motion&                     m_motion;
+            AZStd::unordered_map<AZStd::string, EMotionFX::Motion> m_motions;
             const AZ::RC::Phase                    m_phase;
         };
 

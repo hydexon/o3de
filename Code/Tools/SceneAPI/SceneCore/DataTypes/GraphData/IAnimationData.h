@@ -23,14 +23,32 @@ namespace AZ
             {
             public:
                 AZ_RTTI(IAnimationData, "{62B0571C-6EFF-42FA-902A-85AC744E04F2}", IGraphObject);
+                struct AnimationEntry 
+                {
+                    AnimationEntry()
+                        : m_timeStepBetweenFrames(1.0/30.0)
+                        , m_name("default") {}
 
+                    AnimationEntry(const AZStd::string name, double timeStepBetweenFrames)
+                        : m_timeStepBetweenFrames(timeStepBetweenFrames)
+                        , m_name(name) {}
+                        
+                    AZStd::string& GetName() { return m_name; }
+                    size_t GetKeyFrameCount() const { return m_keyframes.size(); }
+                    const MatrixType& GetKeyFrame(size_t index) const{  return m_keyframes[index]; }
+                    double GetTimeStepBetweenFrames() const { m_timeStepBetweenFrames; }
+
+                    double m_timeStepBetweenFrames;
+                    AZStd::string m_name;
+                    AZStd::vector<MatrixType> m_keyframes;
+                };
                 virtual ~IAnimationData() override = default;
 
                 void CloneAttributesFrom([[maybe_unused]] const IGraphObject* sourceObject) override {}
 
-                virtual size_t GetKeyFrameCount() const = 0;
-                virtual const MatrixType& GetKeyFrame(size_t index) const = 0;
-                virtual double GetTimeStepBetweenFrames() const = 0;
+                virtual size_t GetAnimationStackCount() const = 0;
+                virtual bool GetAnimationStackByName(const AZStd::string& name, AnimationEntry& outEntry) const = 0;
+                virtual bool GetAnimationStack(size_t index, AnimationEntry& outEntry) = 0;
             };
 
             class IBlendShapeAnimationData

@@ -41,9 +41,9 @@ namespace AZ
 
                 SCENE_DATA_API virtual void AddAnimationStack(const AnimationEntry& entry);
                 
-                SCENE_DATA_API size_t GetAnimationStackCount() const override;
-                SCENE_DATA_API bool GetAnimationStackByName(const AZStd::string& name, AnimationEntry& outEntry) const override;
-                SCENE_DATA_API bool GetAnimationStack(size_t index, AnimationEntry& outEntry) override;
+                SCENE_DATA_API size_t GetAnimationSequenceCount() const override;
+                SCENE_DATA_API bool GetAnimationSequenceByName(const AZStd::string& name, AnimationEntry& outEntry) const override;
+                SCENE_DATA_API bool GetAnimationSequence(size_t index, AnimationEntry& outEntry) override;
 
                 SCENE_DATA_API void GetDebugOutput(SceneAPI::Utilities::DebugOutput& output) const override;
 

@@ -300,10 +300,10 @@ namespace EMotionFX
                     rootJoints.emplace_back(jointDataIndex);
                 }
 
-                for(size_t ai = 0; ai < animation->GetAnimationStackCount(); ++ai)
+                for(size_t ai = 0; ai < animation->GetAnimationSequenceCount(); ++ai)
                 {
                     SceneDataTypes::IAnimationData::AnimationEntry entry;
-                    animation->GetAnimationStack(ai, entry);                    
+                    animation->GetAnimationSequence(ai, entry);                    
 
                     const size_t sceneFrameCount = aznumeric_caster(entry.GetKeyFrameCount());
                     size_t startFrame = 0;

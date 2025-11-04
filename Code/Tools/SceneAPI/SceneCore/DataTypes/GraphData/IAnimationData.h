@@ -46,9 +46,9 @@ namespace AZ
 
                 void CloneAttributesFrom([[maybe_unused]] const IGraphObject* sourceObject) override {}
 
-                virtual size_t GetAnimationStackCount() const = 0;
-                virtual bool GetAnimationStackByName(const AZStd::string& name, AnimationEntry& outEntry) const = 0;
-                virtual bool GetAnimationStack(size_t index, AnimationEntry& outEntry) = 0;
+                virtual size_t GetAnimationSequenceCount() const = 0;
+                virtual bool GetAnimationSequenceByName(const AZStd::string& name, AnimationEntry& outEntry) const = 0;
+                virtual bool GetAnimationSequence(size_t index, AnimationEntry& outEntry) = 0;
             };
 
             class IBlendShapeAnimationData

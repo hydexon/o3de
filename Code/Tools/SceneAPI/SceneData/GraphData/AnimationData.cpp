@@ -33,9 +33,9 @@ namespace AZ
                         ->Attribute(AZ::Script::Attributes::ExcludeFrom, AZ::Script::Attributes::ExcludeFlags::ListOnly)
                         ->Attribute(AZ::Script::Attributes::Scope, AZ::Script::Attributes::ScopeFlags::Common)
                         ->Attribute(AZ::Script::Attributes::Module, "scene")
-                        ->Method("GetAnimationStackCount", &SceneAPI::DataTypes::IAnimationData::GetAnimationStackCount)
-                        ->Method("GetAnimationStackByName", &SceneAPI::DataTypes::IAnimationData::GetAnimationStackByName)
-                        ->Method("GetAnimationStack", &SceneAPI::DataTypes::IAnimationData::GetAnimationStack);
+                        ->Method("GetAnimationSequenceCount", &SceneAPI::DataTypes::IAnimationData::GetAnimationSequenceCount)
+                        ->Method("GetAnimationSequenceByName", &SceneAPI::DataTypes::IAnimationData::GetAnimationSequenceByName)
+                        ->Method("GetAnimationSequence", &SceneAPI::DataTypes::IAnimationData::GetAnimationSequence);
                         // ->Method("GetKeyFrameCount", &SceneAPI::DataTypes::IAnimationData::GetKeyFrameCount)
                         // ->Method("GetKeyFrame", &SceneAPI::DataTypes::IAnimationData::GetKeyFrame)
                         // ->Method("GetTimeStepBetweenFrames", &SceneAPI::DataTypes::IAnimationData::GetTimeStepBetweenFrames);
@@ -87,12 +87,12 @@ namespace AZ
             {
                 m_animEntries.push_back(entry);
             }
-            size_t AnimationData::GetAnimationStackCount() const
+            size_t AnimationData::GetAnimationSequenceCount() const
             {
                 return m_animEntries.size();
             }
 
-            bool AnimationData::GetAnimationStackByName(const AZStd::string& name, AnimationEntry& outEntry) const
+            bool AnimationData::GetAnimationSequenceByName(const AZStd::string& name, AnimationEntry& outEntry) const
             {
                 if(m_animEntries.empty())
                     return false;
@@ -108,7 +108,7 @@ namespace AZ
                 return false;
             }
 
-            bool AnimationData::GetAnimationStack(size_t index, AnimationEntry& outEntry)
+            bool AnimationData::GetAnimationSequence(size_t index, AnimationEntry& outEntry)
             {
                 if(index > m_animEntries.size())
                     return false;

@@ -30,6 +30,8 @@ namespace AZ
 
                 SCENE_DATA_API AnimationData();
                 SCENE_DATA_API ~AnimationData() override = default;
+                SCENE_DATA_API virtual const char* GetAnimationName() const;
+                SCENE_DATA_API virtual void SetAnimationName(const char* animName);
                 SCENE_DATA_API virtual void AddKeyFrame(const SceneAPI::DataTypes::MatrixType& keyFrameTransform);
                 SCENE_DATA_API virtual void ReserveKeyFrames(size_t count);
                 SCENE_DATA_API virtual void SetTimeStepBetweenFrames(double timeStep);
@@ -44,6 +46,7 @@ namespace AZ
                 SCENE_DATA_API AZStd::vector<SceneAPI::DataTypes::MatrixType>& GetKeyFrames();
                 SCENE_DATA_API const AZStd::vector<SceneAPI::DataTypes::MatrixType>& GetKeyFrames() const;
             protected:
+                AZStd::string                                     m_animName;
                 AZStd::vector<SceneAPI::DataTypes::MatrixType>    m_keyFrames;
                 double                                            m_timeStepBetweenFrames;
             };

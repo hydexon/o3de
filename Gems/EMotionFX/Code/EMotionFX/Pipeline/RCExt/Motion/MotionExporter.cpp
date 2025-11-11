@@ -49,6 +49,7 @@ namespace EMotionFX
             for (const Group::IMotionGroup& motionGroup : view)
             {
                 AZ_TraceContext("Animation group", motionGroup.GetName());
+                AZ_Info("EMotionFX", "Animation Group Process: %s", motionGroup.GetName().c_str());
                 result += SceneEvents::Process<MotionGroupExportContext>(context, motionGroup, AZ::RC::Phase::Construction);
                 result += SceneEvents::Process<MotionGroupExportContext>(context, motionGroup, AZ::RC::Phase::Filling);
                 result += SceneEvents::Process<MotionGroupExportContext>(context, motionGroup, AZ::RC::Phase::Finalizing);

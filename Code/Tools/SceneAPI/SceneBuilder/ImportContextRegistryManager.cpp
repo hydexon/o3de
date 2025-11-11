@@ -50,7 +50,7 @@ namespace AZ
                     static_cast<int>(fileExtension.length()),
                     fileExtension.data());
                 // search in reverse order since the default AssImp Provider can handle all extenstions
-                for (auto it = m_importContextProviders.rbegin(); it != m_importContextProviders.rend(); ++it)
+                for (auto it = m_importContextProviders.begin(); it != m_importContextProviders.end(); ++it)
                 {
                     if (it->get()->CanHandleExtension(fileExtension))
                     {

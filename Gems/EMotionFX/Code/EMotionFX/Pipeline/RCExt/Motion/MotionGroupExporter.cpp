@@ -65,6 +65,8 @@ namespace EMotionFX
             const AZStd::string emptySourceExtension;
 
             const AZStd::string& groupName = context.m_group.GetName();
+            AZ_Info("EMotionFX", "[MotionGroupExporter::ProcessContext] GroupName: %s", groupName.c_str());
+
             AZStd::string filename = SceneUtil::FileUtilities::CreateOutputFileName(
                 groupName, context.m_outputDirectory, s_fileExtension, emptySourceExtension);
 
@@ -73,21 +75,25 @@ namespace EMotionFX
                 return SceneEvents::ProcessingResult::Failure;
             }
 
-            EMotionFX::Motion* motion = aznew EMotionFX::Motion(groupName.c_str());
-            if (!motion)
-            {
-                return SceneEvents::ProcessingResult::Failure;
-            }
-            motion->SetUnitType(MCore::Distance::UNITTYPE_METERS);
+            //EMotionFX::Motion* motion = aznew EMotionFX::Motion(groupName.c_str());
+            AZStd::vector<EMotionFX::Motion*> motions = AZStd::vector<EMotionFX::Motion*>();
+
+            // if (!motion)
+            // {
+            //     return SceneEvents::ProcessingResult::Failure;
+            // }
+            // motion->SetUnitType(MCore::Distance::UNITTYPE_METERS);
 
             SceneEvents::ProcessingResultCombiner result;
 
             const Group::IMotionGroup& motionGroup = context.m_group;
-            MotionDataBuilderContext dataBuilderContext(context.m_scene, motionGroup, *motion, AZ::RC::Phase::Construction);
+            MotionDataBuilderContext dataBuilderContext(context.m_scene, motionGroup, motions, AZ::RC::Phase::Construction);
             result += SceneEvents::Process(dataBuilderContext);
             result += SceneEvents::Process<MotionDataBuilderContext>(dataBuilderContext, AZ::RC::Phase::Filling);
             result += SceneEvents::Process<MotionDataBuilderContext>(dataBuilderContext, AZ::RC::Phase::Finalizing);
 
+            EMotionFX::Motion* motion = motions[0];
+    
             // Legacy meta data: Check if there is legacy (XML) event data rule and apply it.
             AZStd::vector<MCore::Command*> metaDataCommands;
             if (Rule::MetaDataRule::LoadMetaData(motionGroup, metaDataCommands))
@@ -112,9 +118,13 @@ namespace EMotionFX
                 AZStd::nullopt, AZStd::nullopt);
 
             // The motion object served the purpose of exporting motion and is no longer needed
-            MCore::Destroy(motion);
-            motion = nullptr;
-
+            for(size_t i = 0; i < motions.size(); i++)
+            {
+                EMotionFX::Motion* m = motions[i];
+                MCore::Destroy(m);
+                delete m;
+            }
+            motions.clear();
             return result.GetResult();
         }
     } // namespace Pipeline

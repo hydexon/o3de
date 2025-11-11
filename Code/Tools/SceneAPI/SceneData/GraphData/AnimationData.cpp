@@ -33,6 +33,7 @@ namespace AZ
                         ->Attribute(AZ::Script::Attributes::ExcludeFrom, AZ::Script::Attributes::ExcludeFlags::ListOnly)
                         ->Attribute(AZ::Script::Attributes::Scope, AZ::Script::Attributes::ScopeFlags::Common)
                         ->Attribute(AZ::Script::Attributes::Module, "scene")
+                        ->Method("GetAnimationName", &SceneAPI::DataTypes::IAnimationData::GetAnimationName)
                         ->Method("GetKeyFrameCount", &SceneAPI::DataTypes::IAnimationData::GetKeyFrameCount)
                         ->Method("GetKeyFrame", &SceneAPI::DataTypes::IAnimationData::GetKeyFrame)
                         ->Method("GetTimeStepBetweenFrames", &SceneAPI::DataTypes::IAnimationData::GetTimeStepBetweenFrames);
@@ -46,6 +47,16 @@ namespace AZ
             AnimationData::AnimationData()
                 : m_timeStepBetweenFrames(1.0/30.0) // default value
             {
+            }
+
+            const char* AnimationData::GetAnimationName() const
+            {
+                return m_animName.c_str();
+            }
+
+            void AnimationData::SetAnimationName(const char* animName)
+            {
+                m_animName = animName;
             }
 
             void AnimationData::AddKeyFrame(const SceneAPI::DataTypes::MatrixType& keyFrameTransform)

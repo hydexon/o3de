@@ -19,6 +19,7 @@
 #include <SceneAPI/SceneBuilder/Importers/AssImpImporterUtilities.h>
 #include <SceneAPI/SceneBuilder/Importers/Utilities/RenamedNodesMap.h>
 #include <SceneAPI/SceneCore/Containers/Scene.h>
+#include <SceneAPI/SceneCore/Utilities/Reporting.h>
 #include <SceneAPI/SceneData/GraphData/AnimationData.h>
 #include <SceneAPI/SDKWrapper/AssImpNodeWrapper.h>
 #include <SceneAPI/SDKWrapper/AssImpSceneWrapper.h>
@@ -417,6 +418,8 @@ namespace AZ
                         AZStd::shared_ptr<AZ::SceneData::GraphData::AnimationData> createdAnimationData =
                             AZStd::make_shared<AZ::SceneData::GraphData::AnimationData>();
 
+                        AZ_Info(SceneAPI::Utilities::LogWindow, "(1) AssImp Animation Found: %s, %s", animation->mName.C_Str(), nodeAnim->mName.C_Str());
+                        createdAnimationData->SetAnimationName(nodeAnim->mName.C_Str());
                         const size_t numKeyframes = GetNumKeyFrames(
                             nodeAnim->mNumKeys,
                             animation->mDuration,
@@ -565,8 +568,11 @@ namespace AZ
                         animation->mDuration,
                         animation->mTicksPerSecond);
 
+                    AZ_Info(SceneAPI::Utilities::LogWindow, "(2) AssImp Animation Found: %s", animation->mName.C_Str());
+
                     AZStd::shared_ptr<AZ::SceneData::GraphData::AnimationData> createdAnimationData =
                        AZStd::make_shared<AZ::SceneData::GraphData::AnimationData>();
+                    createdAnimationData->SetAnimationName(animation->mName.C_Str());
                     createdAnimationData->ReserveKeyFrames(numKeyFrames);
                     createdAnimationData->SetTimeStepBetweenFrames(s_defaultTimeStepBetweenFrames);
 

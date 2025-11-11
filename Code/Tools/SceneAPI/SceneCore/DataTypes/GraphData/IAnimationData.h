@@ -28,6 +28,7 @@ namespace AZ
 
                 void CloneAttributesFrom([[maybe_unused]] const IGraphObject* sourceObject) override {}
 
+                virtual const char* GetAnimationName() const = 0;
                 virtual size_t GetKeyFrameCount() const = 0;
                 virtual const MatrixType& GetKeyFrame(size_t index) const = 0;
                 virtual double GetTimeStepBetweenFrames() const = 0;

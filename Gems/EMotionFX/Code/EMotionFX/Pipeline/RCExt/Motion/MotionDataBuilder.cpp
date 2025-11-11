@@ -36,6 +36,23 @@
 #include <AzCore/std/containers/array.h>
 #include <AzToolsFramework/Debug/TraceContext.h>
 
+
+static AZStd::string filterInvalidFileNameChars(const AZStd::string& filename)
+{
+    AZStd::string cleanFilename = filename;
+    const std::array<char, 15> invalidChars = { '<', '>', ':', '"', '/', '\\', '|', '?', '*', ']', '[', '#', '!', '(', ')' };
+    
+    auto isInvalidFilenameChar = [&invalidChars](char c) {
+        for(char ichar : invalidChars)
+            return c == ichar;
+
+        return c < 32;
+    };
+
+    AZStd::replace_if(cleanFilename.begin(), cleanFilename.end(), isInvalidFilenameChar, '_');
+    return cleanFilename;
+}
+
 namespace EMotionFX
 {
     namespace Pipeline
@@ -247,6 +264,9 @@ namespace EMotionFX
             auto contentStorage = graph.GetContentStorage();
             auto nameContentView = SceneContainers::Views::MakePairView(nameStorage, contentStorage);
             auto graphDownwardsView = SceneViews::MakeSceneGraphDownwardsView<SceneViews::BreadthFirst>(graph, rootBoneNodeIndex, nameContentView.begin(), true);
+
+            auto _tempAnimationName = context.m_group.GetName();
+
             for (auto it = graphDownwardsView.begin(); it != graphDownwardsView.end(); ++it)
             {
                 if (!it->second)
@@ -275,8 +295,20 @@ namespace EMotionFX
                 }
 
                 // Currently only get the first (one) AnimationData
-                auto childView = SceneViews::MakeSceneGraphChildView<SceneViews::AcceptEndPointsOnly>(graph, graph.ConvertToNodeIndex(it.GetHierarchyIterator()),
+                auto childView = SceneViews::MakeSceneGraphChildView<>(graph, graph.ConvertToNodeIndex(it.GetHierarchyIterator()),
                         graph.GetContentStorage().begin(), true);
+
+                for(auto node : childView)
+                {
+                    if(!node->RTTI_IsTypeOf(SceneDataTypes::IAnimationData::TYPEINFO_Uuid()))
+                    {
+                        AZ_Warning(SceneUtil::WarningWindow, false, "[MotionDataBuilder::BuildMotionData] Node is not an IAnimationData node is a: %s!", node->RTTI_GetTypeName());
+                        continue;
+                    }
+                    
+                    AZ_Info(SceneUtil::LogWindow, "We got an IAnimationData node!");
+                }
+                
                 auto result = AZStd::find_if(childView.begin(), childView.end(), SceneContainers::DerivedTypeFilter<SceneDataTypes::IAnimationData>());
                 if (result == childView.end())
                 {
@@ -284,6 +316,9 @@ namespace EMotionFX
                 }
 
                 const SceneDataTypes::IAnimationData* animation = azrtti_cast<const SceneDataTypes::IAnimationData*>(result->get());
+                _tempAnimationName =  filterInvalidFileNameChars(animation->GetAnimationName());
+                AZ_Info(SceneUtil::LogWindow, "Processing animation named from source (after cleanup): %s", _tempAnimationName.c_str());
+
                 const size_t jointDataIndex = motionData->AddJoint(nodeName, Transform::CreateIdentity(), Transform::CreateIdentity());
 
                 // Keep track of the sample joint index.
@@ -544,15 +579,18 @@ namespace EMotionFX
             // Delete the data that we created out of the Scene API as it is no longer needed as we already extracted all the data from it
             // into our finalMotionData.
             delete motionData;
-            context.m_motion.SetMotionData(finalMotionData);
+            EMotionFX::Motion* newMotion = aznew EMotionFX::Motion(_tempAnimationName.data());
+            newMotion->SetUnitType(MCore::Distance::UNITTYPE_METERS);
+            newMotion->SetMotionData(finalMotionData);
 
             // Set root motion extraction data on the motion itself, so we can later edit it in animation editor.
             AZStd::shared_ptr<EMotionFX::RootMotionExtractionData> rootMotionData;
             if (EMotionFX::Pipeline::Rule::LoadFromGroup<EMotionFX::Pipeline::Rule::RootMotionExtractionRule>(motionGroup, rootMotionData))
             {
-                context.m_motion.SetRootMotionExtractionData(rootMotionData);
+                newMotion->SetRootMotionExtractionData(rootMotionData);
             }
 
+            context.m_motions.push_back(newMotion);
             return SceneEvents::ProcessingResult::Success;
         }
     } // namespace Pipeline

@@ -78,7 +78,7 @@ namespace EMotionFX
             AZ_RTTI(MotionDataBuilderContext, "{1C5795BB-2130-499E-96AD-50926EFC8CE9}", AZ::SceneAPI::Events::ICallContext);
 
             MotionDataBuilderContext(const AZ::SceneAPI::Containers::Scene& scene, const Group::IMotionGroup& motionGroup,
-                EMotionFX::Motion& motion, AZ::RC::Phase phase);
+                AZStd::vector<EMotionFX::Motion*>& motions, AZ::RC::Phase phase);
             MotionDataBuilderContext(const MotionDataBuilderContext& copyContext, AZ::RC::Phase phase);
             MotionDataBuilderContext(const MotionDataBuilderContext& copyContext) = delete;
             ~MotionDataBuilderContext() override = default;
@@ -87,7 +87,7 @@ namespace EMotionFX
 
             const AZ::SceneAPI::Containers::Scene& m_scene;
             const Group::IMotionGroup&             m_group;
-            EMotionFX::Motion&                     m_motion;
+            AZStd::vector<EMotionFX::Motion*>&      m_motions;
             const AZ::RC::Phase                    m_phase;
         };
 

@@ -50,10 +50,10 @@ namespace EMotionFX
         //==========================================================================
 
         MotionDataBuilderContext::MotionDataBuilderContext(const AZ::SceneAPI::Containers::Scene& scene, const Group::IMotionGroup& motionGroup,
-            EMotionFX::Motion& motion, AZ::RC::Phase phase)
+            AZStd::vector<EMotionFX::Motion*>& motions, AZ::RC::Phase phase)
             : m_scene(scene)
             , m_group(motionGroup)
-            , m_motion(motion)
+            , m_motions(motions)
             , m_phase(phase)
         {
         }
@@ -61,7 +61,7 @@ namespace EMotionFX
         MotionDataBuilderContext::MotionDataBuilderContext(const MotionDataBuilderContext& copyContext, AZ::RC::Phase phase)
             : m_scene(copyContext.m_scene)
             , m_group(copyContext.m_group)
-            , m_motion(copyContext.m_motion)
+            , m_motions(copyContext.m_motions)
             , m_phase(phase)
         {
         }

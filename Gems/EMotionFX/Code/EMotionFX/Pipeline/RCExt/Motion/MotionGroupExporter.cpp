@@ -122,7 +122,7 @@ namespace EMotionFX
             {
                 EMotionFX::Motion* m = motions[i];
                 MCore::Destroy(m);
-                delete m;
+                //delete m;
             }
             motions.clear();
             return result.GetResult();

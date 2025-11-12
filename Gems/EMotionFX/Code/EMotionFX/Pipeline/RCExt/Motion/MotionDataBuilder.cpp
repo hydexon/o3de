@@ -40,16 +40,15 @@
 static AZStd::string filterInvalidFileNameChars(const AZStd::string& filename)
 {
     AZStd::string cleanFilename = filename;
-    const std::array<char, 15> invalidChars = { '<', '>', ':', '"', '/', '\\', '|', '?', '*', ']', '[', '#', '!', '(', ')' };
-    
-    auto isInvalidFilenameChar = [&invalidChars](char c) {
-        for(char ichar : invalidChars)
-            return c == ichar;
+    const AZStd::set<char> invalidChars = { '<', '>', ':', '"', '/', '\\', '|', '?', '*', ']', '[', '#', '!', '(', ')' };
+    for(char& c : cleanFilename)
+    {
+        if(invalidChars.count(c))
+        {
+            c = '_';
+        }
+    }
 
-        return c < 32;
-    };
-
-    AZStd::replace_if(cleanFilename.begin(), cleanFilename.end(), isInvalidFilenameChar, '_');
     return cleanFilename;
 }
 
@@ -298,7 +297,7 @@ namespace EMotionFX
                 auto childView = SceneViews::MakeSceneGraphChildView<>(graph, graph.ConvertToNodeIndex(it.GetHierarchyIterator()),
                         graph.GetContentStorage().begin(), true);
 
-                for(auto node : childView)
+                for(const auto node : childView)
                 {
                     if(!node->RTTI_IsTypeOf(SceneDataTypes::IAnimationData::TYPEINFO_Uuid()))
                     {
@@ -306,7 +305,12 @@ namespace EMotionFX
                         continue;
                     }
                     
-                    AZ_Info(SceneUtil::LogWindow, "We got an IAnimationData node!");
+                    //The motion data processing should go here.
+                    const SceneDataTypes::IAnimationData* animation = azrtti_cast<const SceneDataTypes::IAnimationData*>(node.get());
+                    _tempAnimationName =  animation->GetAnimationName();
+                    _tempAnimationName = filterInvalidFileNameChars(_tempAnimationName);
+                    AZ_Info(SceneUtil::LogWindow, "Processing animation named from source: %s", _tempAnimationName.c_str());
+
                 }
                 
                 auto result = AZStd::find_if(childView.begin(), childView.end(), SceneContainers::DerivedTypeFilter<SceneDataTypes::IAnimationData>());
@@ -316,8 +320,9 @@ namespace EMotionFX
                 }
 
                 const SceneDataTypes::IAnimationData* animation = azrtti_cast<const SceneDataTypes::IAnimationData*>(result->get());
-                _tempAnimationName =  filterInvalidFileNameChars(animation->GetAnimationName());
-                AZ_Info(SceneUtil::LogWindow, "Processing animation named from source (after cleanup): %s", _tempAnimationName.c_str());
+                _tempAnimationName =  animation->GetAnimationName();
+                _tempAnimationName = filterInvalidFileNameChars(_tempAnimationName);
+                AZ_Info(SceneUtil::LogWindow, "Processing animation named from source: %s", _tempAnimationName.c_str());
 
                 const size_t jointDataIndex = motionData->AddJoint(nodeName, Transform::CreateIdentity(), Transform::CreateIdentity());
 

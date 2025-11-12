@@ -532,15 +532,16 @@ namespace AZ
                     return combinedAnimationResult.GetResult();
                 }
                 
-                bool onlyOne = false;
+                //bool onlyOne = false;
 
                 for (auto it = animItr.first; it != animItr.second; ++it)
                 {
+                    /*
                     if (onlyOne)
                     {
                         AZ_Error("AnimationImporter", false, "Bone %s has multiple animations.  Only 1 animation per bone is supported", currentNode->mName.C_Str());
                         break;
-                    }
+                    }*/
 
                     const aiAnimation* animation = it->second.first;
                     const ConsolidatedNodeAnim* anim = &it->second.second;
@@ -602,11 +603,11 @@ namespace AZ
                         createdAnimationData->AddKeyFrame(animTransform);
                     }
 
-                    Containers::SceneGraph::NodeIndex addNode = context.m_scene.GetGraph().AddChild(
-                        context.m_currentGraphPosition, nodeName.c_str(), AZStd::move(createdAnimationData));
-                    context.m_scene.GetGraph().MakeEndPoint(addNode);
+                    // Containers::SceneGraph::NodeIndex addNode = context.m_scene.GetGraph().AddChild(
+                    //     context.m_currentGraphPosition, nodeName.c_str(), AZStd::move(createdAnimationData));
+                    // context.m_scene.GetGraph().MakeEndPoint(addNode);
                     
-                    onlyOne = true;
+                    //onlyOne = true;
                 }
                 
                 combinedAnimationResult += Events::ProcessingResult::Success;

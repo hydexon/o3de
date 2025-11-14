@@ -418,7 +418,6 @@ namespace AZ
                         AZStd::shared_ptr<AZ::SceneData::GraphData::AnimationData> createdAnimationData =
                             AZStd::make_shared<AZ::SceneData::GraphData::AnimationData>();
 
-                        AZ_Info(SceneAPI::Utilities::LogWindow, "(1) AssImp Animation Found: %s, %s", animation->mName.C_Str(), nodeAnim->mName.C_Str());
                         createdAnimationData->SetAnimationName(nodeAnim->mName.C_Str());
                         const size_t numKeyframes = GetNumKeyFrames(
                             nodeAnim->mNumKeys,
@@ -569,7 +568,6 @@ namespace AZ
                         animation->mDuration,
                         animation->mTicksPerSecond);
 
-                    AZ_Info(SceneAPI::Utilities::LogWindow, "(2) AssImp Animation Found: %s", animation->mName.C_Str());
 
                     AZStd::shared_ptr<AZ::SceneData::GraphData::AnimationData> createdAnimationData =
                        AZStd::make_shared<AZ::SceneData::GraphData::AnimationData>();

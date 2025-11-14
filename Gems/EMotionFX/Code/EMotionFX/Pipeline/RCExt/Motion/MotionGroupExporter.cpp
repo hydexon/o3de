@@ -67,16 +67,8 @@ namespace EMotionFX
             const AZStd::string& groupName = context.m_group.GetName();
             AZ_Info("EMotionFX", "[MotionGroupExporter::ProcessContext] GroupName: %s", groupName.c_str());
 
-            AZStd::string filename = SceneUtil::FileUtilities::CreateOutputFileName(
-                groupName, context.m_outputDirectory, s_fileExtension, emptySourceExtension);
-
-            if (filename.empty() || !SceneUtil::FileUtilities::EnsureTargetFolderExists(filename))
-            {
-                return SceneEvents::ProcessingResult::Failure;
-            }
-
             //EMotionFX::Motion* motion = aznew EMotionFX::Motion(groupName.c_str());
-            AZStd::vector<EMotionFX::Motion*> motions = AZStd::vector<EMotionFX::Motion*>();
+            AZStd::vector<AZStd::tuple<EMotionFX::Motion*, AZStd::string>> motions;
 
             // if (!motion)
             // {
@@ -91,39 +83,51 @@ namespace EMotionFX
             result += SceneEvents::Process(dataBuilderContext);
             result += SceneEvents::Process<MotionDataBuilderContext>(dataBuilderContext, AZ::RC::Phase::Filling);
             result += SceneEvents::Process<MotionDataBuilderContext>(dataBuilderContext, AZ::RC::Phase::Finalizing);
-
-            EMotionFX::Motion* motion = motions[0];
     
-            // Legacy meta data: Check if there is legacy (XML) event data rule and apply it.
-            AZStd::vector<MCore::Command*> metaDataCommands;
-            if (Rule::MetaDataRule::LoadMetaData(motionGroup, metaDataCommands))
+            for(auto& mTuple : motions)
             {
-                if (!CommandSystem::MetaData::ApplyMetaDataOnMotion(motion, metaDataCommands))
+                EMotionFX::Motion* motion = AZStd::get<0>(mTuple);
+                AZStd::string& animSanitizedName = AZStd::get<1>(mTuple);
+
+                AZStd::string filename = SceneUtil::FileUtilities::CreateOutputFileName(
+                    animSanitizedName, context.m_outputDirectory, s_fileExtension, emptySourceExtension);
+
+                if (filename.empty() || !SceneUtil::FileUtilities::EnsureTargetFolderExists(filename))
                 {
-                    AZ_Error("EMotionFX", false, "Applying meta data to '%s' failed.", filename.c_str());
+                    AZ_Error("EMotionFX", false, "Failed to generate filepath for motions");
+                    return SceneEvents::ProcessingResult::Failure;
                 }
+
+
+                AZ_Info("EMotionFX", "Attempting to generate %s motion file", filename.data());;
+
+                // Legacy meta data: Check if there is legacy (XML) event data rule and apply it.
+                AZStd::vector<MCore::Command*> metaDataCommands;
+                if (Rule::MetaDataRule::LoadMetaData(motionGroup, metaDataCommands))
+                {
+                    if (!CommandSystem::MetaData::ApplyMetaDataOnMotion(motion, metaDataCommands))
+                    {
+                        AZ_Error("EMotionFX", false, "Applying meta data to '%s' failed.", filename.c_str());
+                    }
+                }
+
+                // Apply motion meta data.
+                AZStd::shared_ptr<EMotionFX::Pipeline::Rule::MotionMetaData> motionMetaData;
+                if (EMotionFX::Pipeline::Rule::LoadFromGroup<EMotionFX::Pipeline::Rule::MotionMetaDataRule>(motionGroup, motionMetaData))
+                {
+                    motion->SetEventTable(motionMetaData->GetClonedEventTable(motion));
+                    motion->SetMotionExtractionFlags(motionMetaData->GetMotionExtractionFlags());
+                }
+
+                ExporterLib::SaveMotion(filename, motion, MCore::Endian::ENDIAN_LITTLE);
+                static AZ::Data::AssetType emotionFXMotionAssetType("{00494B8E-7578-4BA2-8B28-272E90680787}"); // from MotionAsset.h in EMotionFX Gem
+                context.m_products.AddProduct(AZStd::move(filename), context.m_group.GetId(), emotionFXMotionAssetType,
+                    AZStd::nullopt, AZStd::nullopt);
+
+                // The motion object served the purpose of exporting motion and is no longer needed
+                MCore::Destroy(motion);
             }
 
-            // Apply motion meta data.
-            AZStd::shared_ptr<EMotionFX::Pipeline::Rule::MotionMetaData> motionMetaData;
-            if (EMotionFX::Pipeline::Rule::LoadFromGroup<EMotionFX::Pipeline::Rule::MotionMetaDataRule>(motionGroup, motionMetaData))
-            {
-                motion->SetEventTable(motionMetaData->GetClonedEventTable(motion));
-                motion->SetMotionExtractionFlags(motionMetaData->GetMotionExtractionFlags());
-            }
-
-            ExporterLib::SaveMotion(filename, motion, MCore::Endian::ENDIAN_LITTLE);
-            static AZ::Data::AssetType emotionFXMotionAssetType("{00494B8E-7578-4BA2-8B28-272E90680787}"); // from MotionAsset.h in EMotionFX Gem
-            context.m_products.AddProduct(AZStd::move(filename), context.m_group.GetId(), emotionFXMotionAssetType,
-                AZStd::nullopt, AZStd::nullopt);
-
-            // The motion object served the purpose of exporting motion and is no longer needed
-            for(size_t i = 0; i < motions.size(); i++)
-            {
-                EMotionFX::Motion* m = motions[i];
-                MCore::Destroy(m);
-                //delete m;
-            }
             motions.clear();
             return result.GetResult();
         }

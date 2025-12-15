@@ -525,6 +525,7 @@ namespace AZ
                 boneAnimations.insert(AZStd::make_move_iterator(fillerAnimations.begin()), AZStd::make_move_iterator(fillerAnimations.end()));
 
                 auto animItr = boneAnimations.equal_range(currentNode->mName.C_Str());
+                auto boneNode= context.m_currentGraphPosition;
 
                 if (animItr.first == animItr.second)
                 {
@@ -601,10 +602,10 @@ namespace AZ
                         createdAnimationData->AddKeyFrame(animTransform);
                     }
 
-                    // Containers::SceneGraph::NodeIndex addNode = context.m_scene.GetGraph().AddChild(
-                    //     context.m_currentGraphPosition, nodeName.c_str(), AZStd::move(createdAnimationData));
-                    // context.m_scene.GetGraph().MakeEndPoint(addNode);
-                    
+                     Containers::SceneGraph::NodeIndex addNode = context.m_scene.GetGraph().AddChild(
+                         boneNode, nodeName.c_str(), AZStd::move(createdAnimationData));
+                    context.m_scene.GetGraph().MakeEndPoint(addNode);
+
                     //onlyOne = true;
                 }
                 

@@ -6,6 +6,7 @@
  *
  */
 
+#include "AzCore/std/ranges/filter_view.h"
 #include <SceneAPI/SceneCore/Containers/Views/PairIterator.h>
 #include <SceneAPI/SceneCore/Containers/Views/SceneGraphDownwardsIterator.h>
 #include <SceneAPI/SceneCore/Containers/Views/SceneGraphChildIterator.h>
@@ -304,19 +305,28 @@ namespace EMotionFX
                 const char* nodeName = it->first.GetName();
                 const char* nodePath = it->first.GetPath();
 
+
                 // Currently only get the first (one) AnimationData
-                auto childView = SceneViews::MakeSceneGraphChildView<>(graph, graph.ConvertToNodeIndex(it.GetHierarchyIterator()),
+                auto childView = SceneViews::MakeSceneGraphChildView<SceneViews::AcceptEndPointsOnly>(graph, graph.ConvertToNodeIndex(it.GetHierarchyIterator()),
                         graph.GetContentStorage().begin(), true);
+
+                auto filteredView = childView | AZStd::views::filter(SceneContainers::DerivedTypeFilter<SceneDataTypes::IAnimationData>());
+                for(auto result : filteredView)
+                {
+                    const SceneDataTypes::IAnimationData* animation = azrtti_cast<const SceneDataTypes::IAnimationData*>(result.get());
+                    AZ_Info("EMotionFX", "ITER NodeName: %s, NodePath: %s, Animation: %s", nodeName, nodePath, animation->GetAnimationName());
+                }
+
+
+                MotionDataInfo mdi;
 
                 for(const auto node : childView)
                 {
                     if(!node->RTTI_IsTypeOf(SceneDataTypes::IAnimationData::TYPEINFO_Uuid()))
                     {
-                        AZ_Warning(SceneUtil::WarningWindow, false, "[MotionDataBuilder::BuildMotionData] Node is not an IAnimationData node is a: %s!", node->RTTI_GetTypeName());
                         continue;
                     }
 
-                    MotionDataInfo mdi;
                     
                     NonUniformMotionData* motionData = aznew NonUniformMotionData();
                     motionData->SetAdditive(additiveRule ? true : false);
@@ -328,6 +338,7 @@ namespace EMotionFX
 
                     //The motion data processing should go here.
                     const SceneDataTypes::IAnimationData* animation = azrtti_cast<const SceneDataTypes::IAnimationData*>(node.get());
+
                     mdi.animationName = animation->GetAnimationName();
                     _tempAnimationName =  animation->GetAnimationName();
                     mdi.sanitizedAnimationName = filterInvalidFileNameChars(_tempAnimationName);
@@ -464,10 +475,10 @@ namespace EMotionFX
                     )
 
                     mdi.motionData = motionData;
-                    motionDataVec.push_back(mdi);
 
                 } //End adding NonUniformMotionData from multiple IAnimationData nodes.
-                
+                motionDataVec.push_back(mdi);
+
                 /*
                 auto result = AZStd::find_if(childView.begin(), childView.end(), SceneContainers::DerivedTypeFilter<SceneDataTypes::IAnimationData>());
                 if (result == childView.end())
@@ -477,6 +488,7 @@ namespace EMotionFX
 
             } // End looping through bones and adding motion data.
 
+            AZ_Info("EMotionFX", "Total MotionDataVec: %d", motionDataVec.size());
             for(const auto& mdi : motionDataVec)
             {
                 if (rootMotionExtractionRule && mdi.sampleJointDataIndex != InvalidJointDataIndex && mdi.rootJointDataIndex != InvalidJointDataIndex)

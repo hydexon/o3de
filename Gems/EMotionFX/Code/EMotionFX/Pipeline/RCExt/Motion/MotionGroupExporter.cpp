@@ -47,6 +47,7 @@ namespace EMotionFX
 
         SceneEvents::ProcessingResult MotionGroupExporter::ProcessContext(MotionGroupExportContext& context) const
         {
+            AZ_Info("EMotionFX", "FART!");
             if (context.m_phase != AZ::RC::Phase::Filling)
             {
                 return SceneEvents::ProcessingResult::Ignored;
@@ -84,13 +85,15 @@ namespace EMotionFX
             result += SceneEvents::Process<MotionDataBuilderContext>(dataBuilderContext, AZ::RC::Phase::Filling);
             result += SceneEvents::Process<MotionDataBuilderContext>(dataBuilderContext, AZ::RC::Phase::Finalizing);
     
+            int cntSubID = 0;
+            AZ_Info("EMotionFX", "Starting to save the motion files!: %d motions", motions.size());
             for(auto& mTuple : motions)
             {
                 EMotionFX::Motion* motion = AZStd::get<0>(mTuple);
                 AZStd::string& animSanitizedName = AZStd::get<1>(mTuple);
 
                 AZStd::string filename = SceneUtil::FileUtilities::CreateOutputFileName(
-                    animSanitizedName, context.m_outputDirectory, s_fileExtension, emptySourceExtension);
+                    groupName, context.m_outputDirectory, s_fileExtension, animSanitizedName);
 
                 if (filename.empty() || !SceneUtil::FileUtilities::EnsureTargetFolderExists(filename))
                 {
@@ -122,7 +125,7 @@ namespace EMotionFX
                 ExporterLib::SaveMotion(filename, motion, MCore::Endian::ENDIAN_LITTLE);
                 static AZ::Data::AssetType emotionFXMotionAssetType("{00494B8E-7578-4BA2-8B28-272E90680787}"); // from MotionAsset.h in EMotionFX Gem
                 context.m_products.AddProduct(AZStd::move(filename), context.m_group.GetId(), emotionFXMotionAssetType,
-                    AZStd::nullopt, AZStd::nullopt);
+                    cntSubID++, AZStd::nullopt);
 
                 // The motion object served the purpose of exporting motion and is no longer needed
                 MCore::Destroy(motion);

@@ -47,7 +47,6 @@ namespace EMotionFX
 
         SceneEvents::ProcessingResult MotionGroupExporter::ProcessContext(MotionGroupExportContext& context) const
         {
-            AZ_Info("EMotionFX", "FART!");
             if (context.m_phase != AZ::RC::Phase::Filling)
             {
                 return SceneEvents::ProcessingResult::Ignored;

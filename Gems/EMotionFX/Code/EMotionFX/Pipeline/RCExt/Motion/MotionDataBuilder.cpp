@@ -268,6 +268,8 @@ namespace EMotionFX
 
             // Set new motion data.
             AZStd::vector<MotionDataInfo> motionDataVec;
+            AZStd::unordered_set<AZStd::string> animationNameSets;
+            //AZStd::unordered_map<AZStd::string, NonUniformMotionData> animMotionDataMap;
 
             // Grab the rules we need before visiting the scene graph.
             AZStd::shared_ptr<const Rule::MotionSamplingRule> samplingRule = motionGroup.GetRuleContainerConst().FindFirstByType<Rule::MotionSamplingRule>();
@@ -314,7 +316,7 @@ namespace EMotionFX
                 for(auto result : filteredView)
                 {
                     const SceneDataTypes::IAnimationData* animation = azrtti_cast<const SceneDataTypes::IAnimationData*>(result.get());
-                    AZ_Info("EMotionFX", "ITER NodeName: %s, NodePath: %s, Animation: %s", nodeName, nodePath, animation->GetAnimationName());
+                    animationNameSets.insert(animation->GetAnimationName());
                 }
 
 
@@ -324,6 +326,7 @@ namespace EMotionFX
                 {
                     if(!node->RTTI_IsTypeOf(SceneDataTypes::IAnimationData::TYPEINFO_Uuid()))
                     {
+                        AZ_Info("EMotionFX", "Invalid non-Animation data node found, found an %s node", node->RTTI_GetTypeName());
                         continue;
                     }
 
@@ -479,6 +482,7 @@ namespace EMotionFX
                 } //End adding NonUniformMotionData from multiple IAnimationData nodes.
                 motionDataVec.push_back(mdi);
 
+
                 /*
                 auto result = AZStd::find_if(childView.begin(), childView.end(), SceneContainers::DerivedTypeFilter<SceneDataTypes::IAnimationData>());
                 if (result == childView.end())
@@ -487,6 +491,10 @@ namespace EMotionFX
                 }*/
 
             } // End looping through bones and adding motion data.
+            for(const AZStd::string& animName : animationNameSets)
+            {
+                AZ_Info("EMotionFX", "Animation Found: %s", animName.c_str());
+            }
 
             AZ_Info("EMotionFX", "Total MotionDataVec: %d", motionDataVec.size());
             for(const auto& mdi : motionDataVec)

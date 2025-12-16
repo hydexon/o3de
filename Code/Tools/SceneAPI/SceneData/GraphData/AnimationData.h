@@ -62,11 +62,13 @@ namespace AZ
                 SCENE_DATA_API BlendShapeAnimationData();
                 SCENE_DATA_API ~BlendShapeAnimationData() override = default;
                 SCENE_DATA_API void CloneAttributesFrom(const IGraphObject* sourceObject) override;
+                SCENE_DATA_API virtual void SetSourceAnimationName(const char* srcAnimName);
                 SCENE_DATA_API virtual void SetBlendShapeName(const char* name);
                 SCENE_DATA_API virtual void AddKeyFrame(double keyFrameValue);
                 SCENE_DATA_API virtual void ReserveKeyFrames(size_t count);
                 SCENE_DATA_API virtual void SetTimeStepBetweenFrames(double timeStep);
 
+                SCENE_DATA_API const char* GetSourceAnimationName() const override;
                 SCENE_DATA_API const char* GetBlendShapeName() const override;
                 SCENE_DATA_API size_t GetKeyFrameCount() const override;
                 SCENE_DATA_API double GetKeyFrame(size_t index) const override;
@@ -78,6 +80,7 @@ namespace AZ
                 SCENE_DATA_API AZStd::vector<double>& GetKeyFrames();
                 SCENE_DATA_API const AZStd::vector<double>& GetKeyFrames() const;
             protected:
+                AZStd::string            m_sourceAnimationName;
                 AZStd::string            m_blendShapeName;
                 AZStd::vector<double>    m_keyFrames;
                 double                   m_timeStepBetweenFrames;

@@ -673,6 +673,7 @@ namespace AZ
                         AZStd::make_shared<AZ::SceneData::GraphData::BlendShapeAnimationData>();
 
                     const size_t numKeyFrames = GetNumKeyFrames(static_cast<AZ::u32>(keys.size()), animation->mDuration, animation->mTicksPerSecond);
+                    morphAnimNode->SetSourceAnimationName(animation->mName.C_Str());
                     morphAnimNode->ReserveKeyFrames(numKeyFrames);
                     morphAnimNode->SetTimeStepBetweenFrames(s_defaultTimeStepBetweenFrames);
 

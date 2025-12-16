@@ -50,7 +50,7 @@ namespace EMotionFX
         //==========================================================================
 
         MotionDataBuilderContext::MotionDataBuilderContext(const AZ::SceneAPI::Containers::Scene& scene, const Group::IMotionGroup& motionGroup,
-            AZStd::vector<AZStd::tuple<EMotionFX::Motion*, AZStd::string>>& motions, AZ::RC::Phase phase)
+            AZStd::unordered_map<AZStd::string, EMotionFX::Motion*>& motions, AZ::RC::Phase phase)
             : m_scene(scene)
             , m_group(motionGroup)
             , m_motions(motions)

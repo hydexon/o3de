@@ -122,6 +122,7 @@ namespace AZ
                         ->Attribute(AZ::Script::Attributes::ExcludeFrom, AZ::Script::Attributes::ExcludeFlags::ListOnly)
                         ->Attribute(AZ::Script::Attributes::Scope, AZ::Script::Attributes::ScopeFlags::Common)
                         ->Attribute(AZ::Script::Attributes::Module, "scene")
+                        ->Method("GetSourceAnimationName", &SceneAPI::DataTypes::IBlendShapeAnimationData::GetSourceAnimationName)
                         ->Method("GetBlendShapeName", &SceneAPI::DataTypes::IBlendShapeAnimationData::GetBlendShapeName)
                         ->Method("GetKeyFrameCount", &SceneAPI::DataTypes::IBlendShapeAnimationData::GetKeyFrameCount)
                         ->Method("GetKeyFrame", &SceneAPI::DataTypes::IBlendShapeAnimationData::GetKeyFrame)
@@ -147,6 +148,11 @@ namespace AZ
                 }
             }
 
+            void BlendShapeAnimationData::SetSourceAnimationName(const char *srcAnimName)
+            {
+                m_sourceAnimationName = srcAnimName;
+            }
+
             void BlendShapeAnimationData::SetBlendShapeName(const char* blendShapeName)
             {
                 m_blendShapeName = blendShapeName;
@@ -165,6 +171,11 @@ namespace AZ
             void BlendShapeAnimationData::SetTimeStepBetweenFrames(double timeStep)
             {
                 m_timeStepBetweenFrames = timeStep;
+            }
+
+            const char *BlendShapeAnimationData::GetSourceAnimationName() const
+            {
+                return m_sourceAnimationName.c_str();
             }
 
             const char* BlendShapeAnimationData::GetBlendShapeName() const

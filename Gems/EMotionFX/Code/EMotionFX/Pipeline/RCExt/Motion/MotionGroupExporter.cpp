@@ -68,7 +68,7 @@ namespace EMotionFX
             AZ_Info("EMotionFX", "[MotionGroupExporter::ProcessContext] GroupName: %s", groupName.c_str());
 
             //EMotionFX::Motion* motion = aznew EMotionFX::Motion(groupName.c_str());
-            AZStd::vector<AZStd::tuple<EMotionFX::Motion*, AZStd::string>> motions;
+            AZStd::unordered_map<AZStd::string, EMotionFX::Motion*> motions;
 
             // if (!motion)
             // {
@@ -84,12 +84,13 @@ namespace EMotionFX
             result += SceneEvents::Process<MotionDataBuilderContext>(dataBuilderContext, AZ::RC::Phase::Filling);
             result += SceneEvents::Process<MotionDataBuilderContext>(dataBuilderContext, AZ::RC::Phase::Finalizing);
     
-            int cntSubID = 0;
             AZ_Info("EMotionFX", "Starting to save the motion files!: %d motions", motions.size());
-            for(auto& mTuple : motions)
+            for(auto& mit : motions)
             {
-                EMotionFX::Motion* motion = AZStd::get<0>(mTuple);
-                AZStd::string& animSanitizedName = AZStd::get<1>(mTuple);
+                EMotionFX::Motion* motion = mit.second;
+                AZStd::string& animSanitizedName = mit.first;
+
+                AZ::Crc32 nameCrc32(animSanitizedName);
 
                 AZStd::string filename = SceneUtil::FileUtilities::CreateOutputFileName(
                     groupName, context.m_outputDirectory, s_fileExtension, animSanitizedName);
@@ -124,7 +125,7 @@ namespace EMotionFX
                 ExporterLib::SaveMotion(filename, motion, MCore::Endian::ENDIAN_LITTLE);
                 static AZ::Data::AssetType emotionFXMotionAssetType("{00494B8E-7578-4BA2-8B28-272E90680787}"); // from MotionAsset.h in EMotionFX Gem
                 context.m_products.AddProduct(AZStd::move(filename), context.m_group.GetId(), emotionFXMotionAssetType,
-                    cntSubID++, AZStd::nullopt);
+                    nameCrc32.GetValue(), AZStd::nullopt);
 
                 // The motion object served the purpose of exporting motion and is no longer needed
                 MCore::Destroy(motion);

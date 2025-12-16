@@ -6,7 +6,6 @@
  *
  */
 
-#include "AzCore/std/ranges/filter_view.h"
 #include <SceneAPI/SceneCore/Containers/Views/PairIterator.h>
 #include <SceneAPI/SceneCore/Containers/Views/SceneGraphDownwardsIterator.h>
 #include <SceneAPI/SceneCore/Containers/Views/SceneGraphChildIterator.h>
@@ -36,22 +35,7 @@
 #include <AzCore/Math/Quaternion.h>
 #include <AzCore/std/containers/array.h>
 #include <AzToolsFramework/Debug/TraceContext.h>
-
-
-static AZStd::string filterInvalidFileNameChars(const AZStd::string& filename)
-{
-    AZStd::string cleanFilename = filename;
-    const AZStd::set<char> invalidChars = { '<', '>', ':', '"', '/', '\\', '|', '?', '*', ']', '[', '#', '!', '(', ')' };
-    for(char& c : cleanFilename)
-    {
-        if(invalidChars.count(c))
-        {
-            c = '_';
-        }
-    }
-
-    return cleanFilename;
-}
+#include <AzCore/std/ranges/filter_view.h>
 
 namespace EMotionFX
 {
@@ -62,29 +46,21 @@ namespace EMotionFX
         namespace SceneContainers = AZ::SceneAPI::Containers;
         namespace SceneViews = AZ::SceneAPI::Containers::Views;
         namespace SceneDataTypes = AZ::SceneAPI::DataTypes;
-        
-        struct MotionDataInfo
-        {
-            NonUniformMotionData* motionData;
-            size_t sampleJointDataIndex;
-            size_t rootJointDataIndex;
-            size_t maxNumFrames;
-            double lowestTimeStep;
-            AZStd::vector<size_t> rootJoints;
-            AZStd::string sanitizedAnimationName;
-            AZStd::string animationName;
 
-            MotionDataInfo()
-            : motionData(nullptr)
-            , sampleJointDataIndex(AZStd::numeric_limits<size_t>::max())
-            , rootJointDataIndex(AZStd::numeric_limits<size_t>::max())
-            , maxNumFrames(0)
-            , lowestTimeStep(999999999.0)
-            , rootJoints()
-            , sanitizedAnimationName()
-            , animationName()
-            {}
-        };
+        static AZStd::string filterInvalidFileNameChars(const AZStd::string& filename)
+        {
+            AZStd::string cleanFilename = filename;
+            const AZStd::set<char> invalidChars = { '<', '>', ':', '"', '/', '\\', '|', '?', '*', ']', '[', '#', '!', '(', ')' };
+            for(char& c : cleanFilename)
+            {
+                if(invalidChars.count(c))
+                {
+                    c = '_';
+                }
+            }
+
+            return cleanFilename;
+        }
 
         MotionDataBuilder::MotionDataBuilder()
         {
@@ -267,24 +243,30 @@ namespace EMotionFX
             SceneEvents::ProcessingResultCombiner combinedResults;
 
             // Set new motion data.
-            AZStd::vector<MotionDataInfo> motionDataVec;
-            AZStd::unordered_set<AZStd::string> animationNameSets;
-            //AZStd::unordered_map<AZStd::string, NonUniformMotionData> animMotionDataMap;
+            //NonUniformMotionData* motionData = aznew NonUniformMotionData();
+            AZStd::unordered_map<AZStd::string, NonUniformMotionData*> motionDataMap;
 
             // Grab the rules we need before visiting the scene graph.
             AZStd::shared_ptr<const Rule::MotionSamplingRule> samplingRule = motionGroup.GetRuleContainerConst().FindFirstByType<Rule::MotionSamplingRule>();
             AZStd::shared_ptr<const Rule::MotionAdditiveRule> additiveRule = motionGroup.GetRuleContainerConst().FindFirstByType<Rule::MotionAdditiveRule>();
             AZStd::shared_ptr<const Rule::RootMotionExtractionRule> rootMotionExtractionRule = motionGroup.GetRuleContainerConst().FindFirstByType<Rule::RootMotionExtractionRule>();
+            //motionData->SetAdditive(additiveRule ? true : false);
+
+            AZStd::vector<size_t> rootJoints; // The list of root nodes.
 
             // Data for root motion extraction
             const size_t InvalidJointDataIndex = AZStd::numeric_limits<size_t>::max();
+            size_t sampleJointDataIndex = InvalidJointDataIndex;
+            size_t rootJointDataIndex = InvalidJointDataIndex;
+
+            size_t maxNumFrames = 0;
+            double lowestTimeStep = 999999999.0;
 
             auto nameStorage = graph.GetNameStorage();
             auto contentStorage = graph.GetContentStorage();
             auto nameContentView = SceneContainers::Views::MakePairView(nameStorage, contentStorage);
             auto graphDownwardsView = SceneViews::MakeSceneGraphDownwardsView<SceneViews::BreadthFirst>(graph, rootBoneNodeIndex, nameContentView.begin(), true);
 
-            auto _tempAnimationName = context.m_group.GetName();
 
             for (auto it = graphDownwardsView.begin(); it != graphDownwardsView.end(); ++it)
             {
@@ -307,59 +289,62 @@ namespace EMotionFX
                 const char* nodeName = it->first.GetName();
                 const char* nodePath = it->first.GetPath();
 
+                // Add root joint to motion data when root motion extraction rule exsits.
+                // if (rootMotionExtractionRule && boneNodeIndex == rootBoneNodeIndex)
+                // {
+                //     rootJointDataIndex = motionData->AddJoint(nodeName, Transform::CreateIdentity(), Transform::CreateIdentity());
+                // }
 
                 // Currently only get the first (one) AnimationData
                 auto childView = SceneViews::MakeSceneGraphChildView<SceneViews::AcceptEndPointsOnly>(graph, graph.ConvertToNodeIndex(it.GetHierarchyIterator()),
                         graph.GetContentStorage().begin(), true);
 
-                auto filteredView = childView | AZStd::views::filter(SceneContainers::DerivedTypeFilter<SceneDataTypes::IAnimationData>());
-                for(auto result : filteredView)
+                auto animDataView = childView | AZStd::views::filter(SceneContainers::DerivedTypeFilter<SceneDataTypes::IAnimationData>());
+
+                // auto result = AZStd::find_if(childView.begin(), childView.end(), SceneContainers::DerivedTypeFilter<SceneDataTypes::IAnimationData>());
+                // if (result == childView.end())
+                // {
+                //     continue;
+                // }
+                for(auto result : animDataView)
                 {
                     const SceneDataTypes::IAnimationData* animation = azrtti_cast<const SceneDataTypes::IAnimationData*>(result.get());
-                    animationNameSets.insert(animation->GetAnimationName());
-                }
+                    NonUniformMotionData* motionData = nullptr;
 
-
-                MotionDataInfo mdi;
-
-                for(const auto node : childView)
-                {
-                    if(!node->RTTI_IsTypeOf(SceneDataTypes::IAnimationData::TYPEINFO_Uuid()))
+                    const AZStd::string animName = filterInvalidFileNameChars(animation->GetAnimationName()); //Sanitize it, we're going to use it later!
+                    if(motionDataMap.find(animName) == motionDataMap.end())
                     {
-                        AZ_Info("EMotionFX", "Invalid non-Animation data node found, found an %s node", node->RTTI_GetTypeName());
-                        continue;
+                        motionDataMap[animName] = aznew NonUniformMotionData();
+                        motionDataMap[animName]->SetAdditive(additiveRule ? true : false);
+
+                        // Add root joint to motion data when root motion extraction rule exsits.
+                        if (rootMotionExtractionRule && boneNodeIndex == rootBoneNodeIndex)
+                        {
+                            rootJointDataIndex = motionDataMap[animName]->AddJoint(nodeName, Transform::CreateIdentity(), Transform::CreateIdentity());
+                        }
+                        motionData = motionDataMap[animName];
+                    }
+                    else
+                    {
+                        motionData = motionDataMap[animName];
                     }
 
-                    
-                    NonUniformMotionData* motionData = aznew NonUniformMotionData();
-                    motionData->SetAdditive(additiveRule ? true : false);
-                    // Add root joint to motion data when root motion extraction rule exsits.
-                    if (rootMotionExtractionRule && boneNodeIndex == rootBoneNodeIndex)
-                    {
-                        mdi.rootJointDataIndex = motionData->AddJoint(nodeName, Transform::CreateIdentity(), Transform::CreateIdentity());
-                    }
+                    AZ_Assert(motionData != nullptr, "Animation Data is NULL!");
 
-                    //The motion data processing should go here.
-                    const SceneDataTypes::IAnimationData* animation = azrtti_cast<const SceneDataTypes::IAnimationData*>(node.get());
-
-                    mdi.animationName = animation->GetAnimationName();
-                    _tempAnimationName =  animation->GetAnimationName();
-                    mdi.sanitizedAnimationName = filterInvalidFileNameChars(_tempAnimationName);
-                    AZ_Info(SceneUtil::LogWindow, "Processing animation named from source: %s", _tempAnimationName.c_str());
                     const size_t jointDataIndex = motionData->AddJoint(nodeName, Transform::CreateIdentity(), Transform::CreateIdentity());
 
                     // Keep track of the sample joint index.
-                    if (rootMotionExtractionRule && mdi.sampleJointDataIndex == InvalidJointDataIndex
+                    if (rootMotionExtractionRule && sampleJointDataIndex == InvalidJointDataIndex
                         && AzFramework::StringFunc::Find(nodePath, rootMotionExtractionRule->GetData()->m_sampleJoint.c_str()) != AZStd::string::npos)
                     {
-                        mdi.sampleJointDataIndex = jointDataIndex;
+                        sampleJointDataIndex = jointDataIndex;
                     }
 
                     // If we deal with a root bone or one of its child nodes, disable the keytrack optimization.
                     // This prevents sliding feet etc. A better solution is probably to increase compression rates based on the "distance" from the root node, hierarchy wise.
                     if (graph.GetNodeParent(boneNodeIndex) == rootBoneNodeIndex || boneNodeIndex == rootBoneNodeIndex)
                     {
-                        mdi.rootJoints.emplace_back(jointDataIndex);
+                        rootJoints.emplace_back(jointDataIndex);
                     }
 
                     const size_t sceneFrameCount = aznumeric_caster(animation->GetKeyFrameCount());
@@ -377,7 +362,8 @@ namespace EMotionFX
                         if (startFrame >= sceneFrameCount)
                         {
                             AZ_TracePrintf(SceneUtil::ErrorWindow, "Start frame %d is greater or equal than the actual number of frames %d in animation.\n", startFrame, sceneFrameCount);
-                            return SceneEvents::ProcessingResult::Failure;
+                            combinedResults += SceneEvents::ProcessingResult::Failure;
+                            continue;
                         }
                         if (endFrame >= sceneFrameCount)
                         {
@@ -398,7 +384,7 @@ namespace EMotionFX
 
                     const size_t numFrames = (endFrame - startFrame) + 1;
 
-                    mdi.maxNumFrames = AZ::GetMax(numFrames, mdi.maxNumFrames);
+                    maxNumFrames = AZ::GetMax(numFrames, maxNumFrames);
 
                     motionData->AllocateJointPositionSamples(jointDataIndex, numFrames);
                     motionData->AllocateJointRotationSamples(jointDataIndex, numFrames);
@@ -413,7 +399,7 @@ namespace EMotionFX
 
                     // Get the time step and make sure it didn't change compared to other joint animations.
                     const double timeStep = animation->GetTimeStepBetweenFrames() * AZ::Abs(playbackSpeed);
-                    mdi.lowestTimeStep = AZ::GetMin<double>(timeStep, mdi.lowestTimeStep);
+                    lowestTimeStep = AZ::GetMin<double>(timeStep, lowestTimeStep);
 
                     AZ::SceneAPI::DataTypes::MatrixType sampleFrameTransformInverse;
                     if (additiveRule)
@@ -426,7 +412,7 @@ namespace EMotionFX
                         }
                         sampleFrameTransformInverse = animation->GetKeyFrame(sampleFrameIndex).GetInverseFull();
                     }
-                    
+
                     for (size_t frame = 0; frame < numFrames; ++frame)
                     {
                         const float time = aznumeric_cast<float>(frame * timeStep);
@@ -442,7 +428,7 @@ namespace EMotionFX
                         const AZ::Transform convertedTransform = AZ::Transform::CreateFromMatrix3x4(coordSysConverter.ConvertMatrix3x4(boneTransformNoScale));
                         const AZ::Vector3 position = convertedTransform.GetTranslation();
                         const AZ::Quaternion rotation = convertedTransform.GetRotation();
-                        
+
                         // Set the pose when this is the first frame.
                         // This is used as optimization so that poses or non-animated submotions do not need any key tracks.
                         if (frame == 0)
@@ -476,33 +462,18 @@ namespace EMotionFX
                     (
                         motionData->SetJointBindPoseScale(jointDataIndex, bindScale);
                     )
-
-                    mdi.motionData = motionData;
-
-                } //End adding NonUniformMotionData from multiple IAnimationData nodes.
-                motionDataVec.push_back(mdi);
-
-
-                /*
-                auto result = AZStd::find_if(childView.begin(), childView.end(), SceneContainers::DerivedTypeFilter<SceneDataTypes::IAnimationData>());
-                if (result == childView.end())
-                {
-                    continue;
-                }*/
-
+                }
+                //End iteration of AnimationData nodes.
             } // End looping through bones and adding motion data.
-            for(const AZStd::string& animName : animationNameSets)
-            {
-                AZ_Info("EMotionFX", "Animation Found: %s", animName.c_str());
-            }
 
-            AZ_Info("EMotionFX", "Total MotionDataVec: %d", motionDataVec.size());
-            for(const auto& mdi : motionDataVec)
+
+            for(const auto& pair : motionDataMap)
             {
-                if (rootMotionExtractionRule && mdi.sampleJointDataIndex != InvalidJointDataIndex && mdi.rootJointDataIndex != InvalidJointDataIndex)
+                NonUniformMotionData* motionData = pair.second;
+                if (rootMotionExtractionRule && sampleJointDataIndex != InvalidJointDataIndex && rootJointDataIndex != InvalidJointDataIndex)
                 {
                     const auto& data = rootMotionExtractionRule->GetData();
-                    mdi.motionData->ExtractRootMotion(mdi.sampleJointDataIndex, mdi.rootJointDataIndex, *data);
+                    motionData->ExtractRootMotion(sampleJointDataIndex, rootJointDataIndex, *data);
                 }
 
                 if (coordinateSystemRule)
@@ -510,62 +481,77 @@ namespace EMotionFX
                     const float scaleFactor = coordinateSystemRule->GetScale();
                     if (!AZ::IsClose(scaleFactor, 1.0f, FLT_EPSILON)) // If the scale factor is 1, no need to call Scale
                     {
-                        mdi.motionData->Scale(scaleFactor);
+                        motionData->Scale(scaleFactor);
                     }
                 }
+            }
 
-                // Process morphs.
-                auto sceneGraphView = SceneViews::MakePairView(graph.GetNameStorage(), graph.GetContentStorage());
-                auto sceneGraphDownardsIteratorView = SceneViews::MakeSceneGraphDownwardsView<SceneViews::BreadthFirst>(
-                    graph, graph.GetRoot(), sceneGraphView.begin(), true);
+            // Process morphs.
+            auto sceneGraphView = SceneViews::MakePairView(graph.GetNameStorage(), graph.GetContentStorage());
+            auto sceneGraphDownardsIteratorView = SceneViews::MakeSceneGraphDownwardsView<SceneViews::BreadthFirst>(
+                graph, graph.GetRoot(), sceneGraphView.begin(), true);
 
-                auto iterator = sceneGraphDownardsIteratorView.begin();
-                for (; iterator != sceneGraphDownardsIteratorView.end(); ++iterator)
+            auto iterator = sceneGraphDownardsIteratorView.begin();
+            for (; iterator != sceneGraphDownardsIteratorView.end(); ++iterator)
+            {
+                SceneContainers::SceneGraph::HierarchyStorageConstIterator hierarchy = iterator.GetHierarchyIterator();
+                [[maybe_unused]] SceneContainers::SceneGraph::NodeIndex currentIndex = graph.ConvertToNodeIndex(hierarchy);
+                AZ_Assert(currentIndex.IsValid(), "While iterating through the Scene Graph an unexpected invalid entry was found.");
+                AZStd::shared_ptr<const SceneDataTypes::IGraphObject> currentItem = iterator->second;
+                if (hierarchy->IsEndPoint())
                 {
-                    SceneContainers::SceneGraph::HierarchyStorageConstIterator hierarchy = iterator.GetHierarchyIterator();
-                    [[maybe_unused]] SceneContainers::SceneGraph::NodeIndex currentIndex = graph.ConvertToNodeIndex(hierarchy);
-                    AZ_Assert(currentIndex.IsValid(), "While iterating through the Scene Graph an unexpected invalid entry was found.");
-                    AZStd::shared_ptr<const SceneDataTypes::IGraphObject> currentItem = iterator->second;
-                    if (hierarchy->IsEndPoint())
+                    if (currentItem->RTTI_IsTypeOf(SceneDataTypes::IBlendShapeAnimationData::TYPEINFO_Uuid()))
                     {
-                        if (currentItem->RTTI_IsTypeOf(SceneDataTypes::IBlendShapeAnimationData::TYPEINFO_Uuid()))
-                        {
-                            const SceneDataTypes::IBlendShapeAnimationData* blendShapeAnimationData = static_cast<const SceneDataTypes::IBlendShapeAnimationData*>(currentItem.get());
+                        const SceneDataTypes::IBlendShapeAnimationData* blendShapeAnimationData = static_cast<const SceneDataTypes::IBlendShapeAnimationData*>(currentItem.get());
 
-                            const size_t morphDataIndex = mdi.motionData->AddMorph(blendShapeAnimationData->GetBlendShapeName(), 0.0f);
-                            const size_t keyFrameCount = blendShapeAnimationData->GetKeyFrameCount();
-                            mdi.motionData->AllocateMorphSamples(morphDataIndex, keyFrameCount);
-                            const double keyFrameStep = blendShapeAnimationData->GetTimeStepBetweenFrames();
-                            for (int keyFrameIndex = 0; keyFrameIndex < keyFrameCount; keyFrameIndex++)
-                            {
-                                const float keyFrameValue = static_cast<float>(blendShapeAnimationData->GetKeyFrame(keyFrameIndex));
-                                const float keyframeTime = static_cast<float>(keyFrameIndex * keyFrameStep);
-                                mdi.motionData->SetMorphSample(morphDataIndex, keyFrameIndex, {keyframeTime, keyFrameValue});
-                            }
+                        NonUniformMotionData* motionData = nullptr;
+                        AZStd::string animStackName = filterInvalidFileNameChars(blendShapeAnimationData->GetSourceAnimationName());
+                        //Find if there is an existing animation stack we processed before while iterated the bone nodes with animation data.
+                        if(motionDataMap.find(animStackName) == motionDataMap.end())
+                        {
+                            motionDataMap[animStackName] = aznew NonUniformMotionData();
+                            motionDataMap[animStackName]->SetAdditive(additiveRule ? true : false);
+                            motionData = motionDataMap[animStackName];
+                        }
+                        else motionData = motionDataMap[animStackName];
+                        AZ_Assert(motionData != nullptr, "Failed to find an proper animation stack for the blendshape!");
+
+                        const size_t morphDataIndex = motionData->AddMorph(blendShapeAnimationData->GetBlendShapeName(), 0.0f);
+                        const size_t keyFrameCount = blendShapeAnimationData->GetKeyFrameCount();
+                        motionData->AllocateMorphSamples(morphDataIndex, keyFrameCount);
+                        const double keyFrameStep = blendShapeAnimationData->GetTimeStepBetweenFrames();
+                        for (int keyFrameIndex = 0; keyFrameIndex < keyFrameCount; keyFrameIndex++)
+                        {
+                            const float keyFrameValue = static_cast<float>(blendShapeAnimationData->GetKeyFrame(keyFrameIndex));
+                            const float keyframeTime = static_cast<float>(keyFrameIndex * keyFrameStep);
+                            motionData->SetMorphSample(morphDataIndex, keyFrameIndex, {keyframeTime, keyFrameValue});
                         }
                     }
                 }
+            }
 
+            for(const auto&[animName, motionData] : motionDataMap)
+            {
                 // Add missing keyframes at the end of the animation to match all keytracks' duration.
-                mdi.motionData->FixMissingEndKeyframes();
+                motionData->FixMissingEndKeyframes();
 
                 // Let's prepare the motion data in the type we want.
                 // This can later be extended with other types of motion data like least square fit curves etc.
-                mdi.motionData->UpdateDuration();
-                if (!mdi.motionData->VerifyIntegrity())
+                motionData->UpdateDuration();
+                if (!motionData->VerifyIntegrity())
                 {
                     AZ_Error(SceneUtil::ErrorWindow, false, "Data integrity issue in '%s'.", motionGroup.GetName().c_str());
                     combinedResults += SceneEvents::ProcessingResult::Failure;
                     continue;
                 }
-                else combinedResults += SceneEvents::ProcessingResult::Success;
+
 
                 // Get the sample rate we have setup or that we have used.
                 // Also make sure we don't sample at higher rate than we want.
                 float sampleRate = 30.0f;
-                if (mdi.lowestTimeStep > 0.0)
+                if (lowestTimeStep > 0.0)
                 {
-                    const float maxSampleRate = static_cast<float>(1.0 / mdi.lowestTimeStep);
+                    const float maxSampleRate = static_cast<float>(1.0 / lowestTimeStep);
                     if (samplingRule && samplingRule->GetSampleRateMethod() == EMotionFX::Pipeline::Rule::MotionSamplingRule::SampleRateMethod::Custom)
                     {
                         sampleRate = AZ::GetMin(maxSampleRate, samplingRule->GetCustomSampleRate());
@@ -576,14 +562,14 @@ namespace EMotionFX
                     }
                 }
                 AZ_TracePrintf("EMotionFX", "Motion sample rate = %f", sampleRate);
-                mdi.motionData->RemoveRedundantKeyframes(samplingRule ? !samplingRule->GetKeepDuration() : false); // Clear any tracks of non-animated parts.
-                if (!mdi.motionData->VerifyIntegrity())
+                motionData->RemoveRedundantKeyframes(samplingRule ? !samplingRule->GetKeepDuration() : false); // Clear any tracks of non-animated parts.
+                if (!motionData->VerifyIntegrity())
                 {
                     AZ_Error(SceneUtil::ErrorWindow, false, "Data integrity issue after removing redundant keyframes for '%s'.", motionGroup.GetName().c_str());
                     combinedResults += SceneEvents::ProcessingResult::Failure;
                     continue;
+                }
 
-                } else combinedResults += SceneEvents::ProcessingResult::Success;
 
                 // Create the desired type of motion data, based on what is selected in the motion sampling rule.
                 MotionData* finalMotionData = nullptr;
@@ -592,7 +578,7 @@ namespace EMotionFX
                 const MotionDataFactory& motionDataFactory = GetMotionManager().GetMotionDataFactory();
                 if (isAutomaticMode) // Automatically pick a motion data type, based on the data size.
                 {
-                    finalMotionData = AutoCreateMotionData(mdi.motionData, sampleRate, samplingRule.get(), mdi.rootJoints);
+                    finalMotionData = AutoCreateMotionData(motionData, sampleRate, samplingRule.get(), rootJoints);
                 }
                 else if (motionDataFactory.IsRegisteredTypeId(motionDataTypeId)) // Yay, we found the typeId, so let's create it through the factory.
                 {
@@ -615,11 +601,12 @@ namespace EMotionFX
                     finalMotionData = aznew UniformMotionData();
                 }
 
+
                 // Initialize the final motion data.
                 // We already have done this one page above, when we are in automatic mode, so skip when we use automatic mode.
                 if (!isAutomaticMode)
                 {
-                    InitAndOptimizeMotionData(finalMotionData, mdi.motionData, sampleRate, samplingRule.get(), mdi.rootJoints);
+                    InitAndOptimizeMotionData(finalMotionData, motionData, sampleRate, samplingRule.get(), rootJoints);
                 }
 
                 if (!finalMotionData->VerifyIntegrity())
@@ -631,22 +618,23 @@ namespace EMotionFX
 
                 // Delete the data that we created out of the Scene API as it is no longer needed as we already extracted all the data from it
                 // into our finalMotionData.
-                delete mdi.motionData;
-                
-                EMotionFX::Motion* newMotion = aznew EMotionFX::Motion(mdi.sanitizedAnimationName.data());
-                newMotion->SetUnitType(MCore::Distance::UNITTYPE_METERS);
-                newMotion->SetMotionData(finalMotionData);
+                delete motionData;
+                if(context.m_motions.find(animName) == context.m_motions.end())
+                {
+                    context.m_motions[animName] = aznew EMotionFX::Motion(animName.data());
+                    context.m_motions[animName]->SetUnitType(MCore::Distance::UNITTYPE_METERS);
+                }
+                context.m_motions[animName]->SetMotionData(finalMotionData);
 
                 // Set root motion extraction data on the motion itself, so we can later edit it in animation editor.
                 AZStd::shared_ptr<EMotionFX::RootMotionExtractionData> rootMotionData;
                 if (EMotionFX::Pipeline::Rule::LoadFromGroup<EMotionFX::Pipeline::Rule::RootMotionExtractionRule>(motionGroup, rootMotionData))
                 {
-                    newMotion->SetRootMotionExtractionData(rootMotionData);
+                    context.m_motions[animName]->SetRootMotionExtractionData(rootMotionData);
                 }
-
-                context.m_motions.push_back(AZStd::make_tuple(newMotion, mdi.sanitizedAnimationName));
             }
 
+            motionDataMap.clear();
             return combinedResults.GetResult();
         }
     } // namespace Pipeline

@@ -91,9 +91,8 @@ namespace EMotionFX
                 AZStd::string& animSanitizedName = mit.first;
 
                 AZ::Crc32 nameCrc32(animSanitizedName);
-
                 AZStd::string filename = SceneUtil::FileUtilities::CreateOutputFileName(
-                    groupName, context.m_outputDirectory, s_fileExtension, animSanitizedName);
+                    groupName, context.m_outputDirectory, s_fileExtension, motions.size() > 1 ? animSanitizedName : emptySourceExtension);
 
                 if (filename.empty() || !SceneUtil::FileUtilities::EnsureTargetFolderExists(filename))
                 {
@@ -125,7 +124,7 @@ namespace EMotionFX
                 ExporterLib::SaveMotion(filename, motion, MCore::Endian::ENDIAN_LITTLE);
                 static AZ::Data::AssetType emotionFXMotionAssetType("{00494B8E-7578-4BA2-8B28-272E90680787}"); // from MotionAsset.h in EMotionFX Gem
                 context.m_products.AddProduct(AZStd::move(filename), context.m_group.GetId(), emotionFXMotionAssetType,
-                    nameCrc32.GetValue(), AZStd::nullopt);
+                    AZStd::nullopt, nameCrc32.GetValue());
 
                 // The motion object served the purpose of exporting motion and is no longer needed
                 MCore::Destroy(motion);

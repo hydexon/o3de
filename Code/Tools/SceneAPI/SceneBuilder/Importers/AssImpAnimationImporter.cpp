@@ -401,49 +401,54 @@ namespace AZ
                     }
                 }
 
-                AZStd::string nodeName = s_animationNodeName;
-                RenamedNodesMap::SanitizeNodeName(nodeName, context.m_scene.GetGraph(), context.m_currentGraphPosition);
-                AZ_TraceContext("Animation node name", nodeName);
 
                 // If there are no bone animations, but there are mesh animations,
                 // then a stub animation needs to be created so the exporter can create the exported morph target animation.
                 if (boneAnimations.empty() && !meshMorphAnimations.empty())
                 {
-                    const aiAnimation* animation = scene->mAnimations[0];
-                    for (AZ::u32 channelIndex = 0; channelIndex < animation->mNumMorphMeshChannels; ++channelIndex)
+                    for(int i = 0; i < scene->mNumAnimations; ++i)
                     {
-                        const aiMeshMorphAnim* nodeAnim = animation->mMorphMeshChannels[channelIndex];
-                        // Morph animations need a regular animation on the node, as well.
-                        // If there is no bone animation on the current node, then generate one here.
-                        AZStd::shared_ptr<AZ::SceneData::GraphData::AnimationData> createdAnimationData =
-                            AZStd::make_shared<AZ::SceneData::GraphData::AnimationData>();
+                        const aiAnimation* animation = scene->mAnimations[i];
+                        AZStd::string nodeName = animation->mName.C_Str();
+                        RenamedNodesMap::SanitizeNodeName(nodeName, context.m_scene.GetGraph(), context.m_currentGraphPosition);
+                        AZ_TraceContext("Animation node name", nodeName);
 
-                        createdAnimationData->SetAnimationName(nodeAnim->mName.C_Str());
-                        const size_t numKeyframes = GetNumKeyFrames(
-                            nodeAnim->mNumKeys,
-                            animation->mDuration,
-                            animation->mTicksPerSecond);
-                        createdAnimationData->ReserveKeyFrames(numKeyframes);
 
-                        const double timeStepBetweenFrames = 1.0 / animation->mTicksPerSecond;
-                        createdAnimationData->SetTimeStepBetweenFrames(timeStepBetweenFrames);
-
-                        // Set every frame of the animation to the start location of the node.
-                        aiMatrix4x4 combinedTransform = GetConcatenatedLocalTransform(currentNode);
-                        DataTypes::MatrixType localTransform = AssImpSDKWrapper::AssImpTypeConverter::ToTransform(combinedTransform);
-                        context.m_sourceSceneSystem.SwapTransformForUpAxis(localTransform);
-                        context.m_sourceSceneSystem.ConvertUnit(localTransform);
-                        for (AZ::u32 time = 0; time <= numKeyframes; ++time)
+                        for (AZ::u32 channelIndex = 0; channelIndex < animation->mNumMorphMeshChannels; ++channelIndex)
                         {
-                            createdAnimationData->AddKeyFrame(localTransform);
+                            const aiMeshMorphAnim* nodeAnim = animation->mMorphMeshChannels[channelIndex];
+                            // Morph animations need a regular animation on the node, as well.
+                            // If there is no bone animation on the current node, then generate one here.
+                            AZStd::shared_ptr<AZ::SceneData::GraphData::AnimationData> createdAnimationData =
+                                AZStd::make_shared<AZ::SceneData::GraphData::AnimationData>();
+
+                            createdAnimationData->SetAnimationName(animation->mName.C_Str());
+                            const size_t numKeyframes = GetNumKeyFrames(
+                                nodeAnim->mNumKeys,
+                                animation->mDuration,
+                                animation->mTicksPerSecond);
+                            createdAnimationData->ReserveKeyFrames(numKeyframes);
+
+                            const double timeStepBetweenFrames = 1.0 / animation->mTicksPerSecond;
+                            createdAnimationData->SetTimeStepBetweenFrames(timeStepBetweenFrames);
+
+                            // Set every frame of the animation to the start location of the node.
+                            aiMatrix4x4 combinedTransform = GetConcatenatedLocalTransform(currentNode);
+                            DataTypes::MatrixType localTransform = AssImpSDKWrapper::AssImpTypeConverter::ToTransform(combinedTransform);
+                            context.m_sourceSceneSystem.SwapTransformForUpAxis(localTransform);
+                            context.m_sourceSceneSystem.ConvertUnit(localTransform);
+                            for (AZ::u32 time = 0; time <= numKeyframes; ++time)
+                            {
+                                createdAnimationData->AddKeyFrame(localTransform);
+                            }
+
+                            AZStd::string stubBoneAnimForMorphName(AZStd::string::format("%s%s", nodeName.c_str(), nodeAnim->mName.C_Str()));
+                            RenamedNodesMap::SanitizeNodeName(stubBoneAnimForMorphName, context.m_scene.GetGraph(), context.m_currentGraphPosition);
+
+                            Containers::SceneGraph::NodeIndex addNode = context.m_scene.GetGraph().AddChild(
+                                context.m_currentGraphPosition, stubBoneAnimForMorphName.c_str(), AZStd::move(createdAnimationData));
+                            context.m_scene.GetGraph().MakeEndPoint(addNode);
                         }
-
-                        AZStd::string stubBoneAnimForMorphName(AZStd::string::format("%s%s", nodeName.c_str(), nodeAnim->mName.C_Str()));
-                        RenamedNodesMap::SanitizeNodeName(stubBoneAnimForMorphName, context.m_scene.GetGraph(), context.m_currentGraphPosition);
-
-                        Containers::SceneGraph::NodeIndex addNode = context.m_scene.GetGraph().AddChild(
-                            context.m_currentGraphPosition, stubBoneAnimForMorphName.c_str(), AZStd::move(createdAnimationData));
-                        context.m_scene.GetGraph().MakeEndPoint(addNode);
                     }
                     
                     return combinedAnimationResult.GetResult();
@@ -525,7 +530,7 @@ namespace AZ
                 boneAnimations.insert(AZStd::make_move_iterator(fillerAnimations.begin()), AZStd::make_move_iterator(fillerAnimations.end()));
 
                 auto animItr = boneAnimations.equal_range(currentNode->mName.C_Str());
-                auto boneNode= context.m_currentGraphPosition;
+                //auto boneNode= context.m_currentGraphPosition;
 
                 if (animItr.first == animItr.second)
                 {
@@ -545,6 +550,9 @@ namespace AZ
 
                     const aiAnimation* animation = it->second.first;
                     const ConsolidatedNodeAnim* anim = &it->second.second;
+
+                    AZStd::string nodeName = animation->mName.C_Str();
+                    RenamedNodesMap::SanitizeNodeName(nodeName, context.m_scene.GetGraph(), context.m_currentGraphPosition);
 
                     // We don't currently handle having a different number of keys, with 1 exception:
                     // 1 key is essentially a constant so we do handle that case
@@ -603,7 +611,7 @@ namespace AZ
                     }
 
                      Containers::SceneGraph::NodeIndex addNode = context.m_scene.GetGraph().AddChild(
-                         boneNode, nodeName.c_str(), AZStd::move(createdAnimationData));
+                         context.m_currentGraphPosition, nodeName.c_str(), AZStd::move(createdAnimationData));
                     context.m_scene.GetGraph().MakeEndPoint(addNode);
 
                     //onlyOne = true;
@@ -706,7 +714,7 @@ namespace AZ
                     // Duplicates can exist if an anim mesh had a name with a suffix like .001, in that case
                     // AssImp will strip off that suffix. Note that this behavior is separate from the
                     // scan for a period in the node name that came before this.
-                    AZStd::string originalNodeName(AZStd::string::format("%s_%s", s_animationNodeName, nodeName.data()));
+                    AZStd::string originalNodeName(AZStd::string::format("%s_%s", animation->mName.C_Str(), nodeName.data()));
                     AZStd::string animNodeName(originalNodeName);
                     if (RenamedNodesMap::SanitizeNodeName(
                         animNodeName, context.m_scene.GetGraph(), context.m_currentGraphPosition, originalNodeName.c_str()))
